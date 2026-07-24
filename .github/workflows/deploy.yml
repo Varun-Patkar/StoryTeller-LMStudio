@@ -1,0 +1,52 @@
+name: Deploy reader to GitHub Pages
+
+# Builds ONLY the reader (apps/reader). The engine (apps/engine) is local-only and is
+# never built or deployed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "books/**"
+      - "apps/reader/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install reader dependencies
+        working-directory: apps/reader
+        run: npm install
+      - name: Build reader
+        working-directory: apps/reader
+        run: npm run build
+      - name: Disable Jekyll
+        run: touch apps/reader/dist/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/reader/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

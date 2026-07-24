@@ -1,0 +1,58 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { listBooks } from "../lib/books.js";
+const books = await listBooks();
+---
+
+<Layout title="Books · StoryTeller Engine">
+  <h1>Your books</h1>
+  <p class="sub">Local library under <span class="mono">books/</span>. Open one to write, or start a new one.</p>
+
+  <div class="grid">
+    {books.map((b) => (
+      <a class="card book-tile" href={`/book/${b.slug}`}>
+        <h3>{b.title}</h3>
+        <div class="meta">{b.slug} · {b.chapters} chapter{b.chapters === 1 ? "" : "s"}{b.status ? ` · ${b.status}` : ""}</div>
+      </a>
+    ))}
+    {books.length === 0 && <p class="note">No books yet.</p>}
+  </div>
+
+  <div class="card">
+    <h2>New book</h2>
+    <div class="row" style="align-items:flex-end">
+      <div style="flex:1 1 320px">
+        <label for="title">Title</label>
+        <input id="title" placeholder="The Sample Story" />
+      </div>
+      <div style="flex:1 1 220px">
+        <label for="slug">Folder name (optional)</label>
+        <input id="slug" placeholder="auto from title" />
+      </div>
+      <button class="btn" id="create">Create</button>
+    </div>
+    <p class="note">A new book is scaffolded with human-owned prompt files (the system prompt ships as an AI placeholder to replace) and empty memory folders.</p>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</Layout>
+
+<script>
+  const toast = (msg, err = false) => {
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.className = "toast show" + (err ? " err" : "");
+    setTimeout(() => (t.className = "toast"), 2600);
+  };
+  document.getElementById("create").addEventListener("click", async () => {
+    const title = document.getElementById("title").value.trim();
+    const name = document.getElementById("slug").value.trim();
+    if (!title && !name) return toast("Give it a title.", true);
+    const res = await fetch("/api/books", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, name }),
+    });
+    const data = await res.json();
+    if (!res.ok) return toast(data.error || "Failed.", true);
+    location.href = `/book/${data.slug}`;
+  });
+</script>

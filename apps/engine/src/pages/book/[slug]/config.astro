@@ -1,0 +1,34 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import BookTabs from "../../../components/BookTabs.astro";
+import { getBook, readBookFile } from "../../../lib/books.js";
+
+const { slug } = Astro.params;
+const book = await getBook(slug);
+if (!book) return Astro.redirect("/");
+const content = await readBookFile(slug, "config.md");
+---
+
+<Layout title={`Config · ${book.title}`}>
+  <h1>{book.title}</h1>
+  <p class="sub mono">{book.slug}</p>
+  <BookTabs slug={slug} active="config" />
+
+  <div class="card">
+    <h2>config.md</h2>
+    <p class="note">Human-written story settings (YAML frontmatter + your notes). The <code>title</code> field is what the reader shows.</p>
+    <textarea id="editor" style="min-height:460px" set:text={content}></textarea>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" id="save">Save</button>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+</Layout>
+
+<script define:vars={{ slug }}>
+  const toast = (m, e = false) => { const t = document.getElementById("toast"); t.textContent = m; t.className = "toast show" + (e ? " err" : ""); setTimeout(() => (t.className = "toast"), 2200); };
+  document.getElementById("save").addEventListener("click", async () => {
+    const res = await fetch("/api/file", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, rel: "config.md", content: document.getElementById("editor").value }) });
+    toast(res.ok ? "Saved." : "Save failed.", !res.ok);
+  });
+</script>

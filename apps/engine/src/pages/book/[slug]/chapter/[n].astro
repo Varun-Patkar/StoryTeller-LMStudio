@@ -1,0 +1,159 @@
+---
+import Layout from "../../../../layouts/Layout.astro";
+import matter from "gray-matter";
+import { getBook, readBookFile, chapterRel, planSlice, stripComments } from "../../../../lib/books.js";
+
+const { slug, n } = Astro.params;
+const num = Number(n);
+const book = await getBook(slug);
+if (!book || !Number.isInteger(num) || num < 1) return Astro.redirect(`/book/${slug}`);
+
+const rel = chapterRel(num);
+const raw = await readBookFile(slug, rel);
+const parsed = raw ? matter(raw) : { data: {}, content: "" };
+const chapterTitle = parsed.data.title || `Chapter ${num}`;
+const chapterBody = parsed.content.trim();
+
+const planText = stripComments(await readBookFile(slug, "plan.md"));
+const slice = planSlice(planText, num);
+---
+
+<Layout title={`Chapter ${num} · ${book.title}`}>
+  <div class="row" style="justify-content:space-between">
+    <div>
+      <h1 style="margin-bottom:2px">{book.title}</h1>
+      <p class="sub mono">chapter {num}</p>
+    </div>
+    <a class="btn ghost" href={`/book/${slug}`}>← Book</a>
+  </div>
+
+  <div class="card">
+    <h2>Plan slice for this chapter</h2>
+    <p class="note">What gets sent as the plan for chapter {num}. Edit here to control exactly what the model sees (edits are used for generation, not saved to plan.md).</p>
+    <textarea id="slice" style="min-height:140px" set:text={slice}></textarea>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">Chapter text</h2>
+      <div class="row">
+        <button class="btn" id="gen">Generate draft</button>
+        <button class="btn ghost" id="save">Save chapter</button>
+      </div>
+    </div>
+    <label for="title">Title</label>
+    <input id="title" value={chapterTitle} />
+    <label for="editor">Prose</label>
+    <textarea id="editor" style="min-height:460px" set:text={chapterBody}></textarea>
+    <span class="note" id="status"></span>
+  </div>
+
+  <div class="card">
+    <h2>Rewrite by comment</h2>
+    <p class="note">Select a passage in the prose above (or select nothing to rewrite the whole chapter),
+      leave a note describing the change, and the model revises it — guided by <em>your</em> rewrite-prompt.
+      Nothing is applied until you accept it.</p>
+    <div id="sel-info" class="note mono">Nothing selected — the whole chapter will be rewritten.</div>
+    <label for="comment">Your note</label>
+    <textarea id="comment" style="min-height:80px" placeholder="e.g. cut the exposition, keep it colder, more like the samples"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="rewrite">Rewrite</button>
+      <span class="note" id="rw-status"></span>
+    </div>
+
+    <div id="result" style="display:none;margin-top:14px">
+      <label>Proposed revision</label>
+      <textarea id="result-text" style="min-height:200px"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="apply">Apply</button>
+        <button class="btn ghost" id="discard">Discard</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Summary entry (optional)</h2>
+    <p class="note">Append a short summary of this chapter to <span class="mono">summary.md</span> so later chapters stay consistent.</p>
+    <textarea id="summary" style="min-height:90px" placeholder="One short paragraph: what happened, what changed."></textarea>
+    <div class="row" style="margin-top:10px"><button class="btn ghost" id="add-summary">Append to summary</button></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</Layout>
+
+<script define:vars={{ slug, num, rel }}>
+  const $ = (id) => document.getElementById(id);
+  const toast = (m, e = false) => { const t = $("toast"); t.textContent = m; t.className = "toast show" + (e ? " err" : ""); setTimeout(() => (t.className = "toast"), 2600); };
+  const editor = $("editor");
+
+  // Track selection within the editor.
+  let sel = { start: 0, end: 0 };
+  function updateSel() {
+    sel = { start: editor.selectionStart, end: editor.selectionEnd };
+    const has = sel.end > sel.start;
+    $("sel-info").textContent = has
+      ? `Selected ${sel.end - sel.start} characters — only that span will be rewritten.`
+      : "Nothing selected — the whole chapter will be rewritten.";
+  }
+  editor.addEventListener("select", updateSel);
+  editor.addEventListener("keyup", updateSel);
+  editor.addEventListener("mouseup", updateSel);
+
+  $("gen").addEventListener("click", async () => {
+    $("status").textContent = "Generating from your prompts…";
+    $("gen").disabled = true;
+    try {
+      const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, task: "chapter", n: num, planSlice: $("slice").value }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed.");
+      editor.value = data.text.trim();
+      $("status").textContent = "Draft in editor — edit it into something human, then Save.";
+    } catch (err) { $("status").textContent = ""; toast(err.message, true); }
+    finally { $("gen").disabled = false; }
+  });
+
+  $("save").addEventListener("click", async () => {
+    const title = $("title").value.trim() || `Chapter ${num}`;
+    const content = `---\ntitle: ${title}\nnumber: ${num}\n---\n\n${editor.value.trim()}\n`;
+    const res = await fetch("/api/file", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, rel, content }) });
+    toast(res.ok ? "Chapter saved." : "Save failed.", !res.ok);
+  });
+
+  $("rewrite").addEventListener("click", async () => {
+    const comment = $("comment").value.trim();
+    if (!comment) return toast("Leave a note first.", true);
+    const selection = sel.end > sel.start ? editor.value.slice(sel.start, sel.end) : "";
+    $("rw-status").textContent = "Revising…";
+    $("rewrite").disabled = true;
+    try {
+      const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, task: "rewrite", fullText: editor.value, selection, comment }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed.");
+      $("result-text").value = data.text.trim();
+      $("result").style.display = "block";
+      $("rw-status").textContent = "";
+    } catch (err) { $("rw-status").textContent = ""; toast(err.message, true); }
+    finally { $("rewrite").disabled = false; }
+  });
+
+  $("apply").addEventListener("click", () => {
+    const revised = $("result-text").value;
+    if (sel.end > sel.start) {
+      editor.value = editor.value.slice(0, sel.start) + revised + editor.value.slice(sel.end);
+    } else {
+      editor.value = revised;
+    }
+    $("result").style.display = "none";
+    $("comment").value = "";
+    updateSel();
+    toast("Applied. Remember to Save.");
+  });
+  $("discard").addEventListener("click", () => { $("result").style.display = "none"; });
+
+  $("add-summary").addEventListener("click", async () => {
+    const text = $("summary").value.trim();
+    if (!text) return toast("Nothing to append.", true);
+    const res = await fetch("/api/summary", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, n: num, text }) });
+    if (res.ok) { toast("Appended to summary."); $("summary").value = ""; } else toast("Failed.", true);
+  });
+</script>

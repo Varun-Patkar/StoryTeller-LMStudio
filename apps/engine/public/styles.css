@@ -1,0 +1,269 @@
+:root {
+	--bg: #14110f;
+	--panel: #1d1916;
+	--panel-2: #262019;
+	--ink: #efe7dc;
+	--muted: #a89a88;
+	--line: #37302a;
+	--accent: #d8a657;
+	--accent-ink: #14110f;
+	--danger: #e06c6c;
+	--ok: #8ec07c;
+	--radius: 10px;
+	--mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+}
+
+* {
+	box-sizing: border-box;
+}
+html,
+body {
+	margin: 0;
+}
+body {
+	background: var(--bg);
+	color: var(--ink);
+	font:
+		15px/1.6 ui-serif,
+		Georgia,
+		"Times New Roman",
+		serif;
+}
+a {
+	color: var(--accent);
+	text-decoration: none;
+}
+a:hover {
+	text-decoration: underline;
+}
+
+.topbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 20px;
+	border-bottom: 1px solid var(--line);
+	background: var(--panel);
+}
+.brand {
+	font-weight: 700;
+	font-family: var(--mono);
+	color: var(--ink);
+}
+.brand span {
+	color: var(--accent);
+}
+.topbar nav a {
+	margin-left: 18px;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 13px;
+}
+
+.wrap {
+	max-width: 1000px;
+	margin: 0 auto;
+	padding: 28px 20px 60px;
+}
+.foot {
+	color: var(--muted);
+	font-size: 12px;
+	text-align: center;
+	padding: 24px;
+	border-top: 1px solid var(--line);
+}
+
+h1 {
+	font-size: 26px;
+	margin: 0 0 6px;
+}
+h2 {
+	font-size: 18px;
+	margin: 28px 0 10px;
+}
+.sub {
+	color: var(--muted);
+	margin-top: 0;
+}
+
+.card {
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	padding: 18px;
+	margin: 14px 0;
+}
+.grid {
+	display: grid;
+	gap: 14px;
+	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.book-tile {
+	display: block;
+}
+.book-tile h3 {
+	margin: 0 0 4px;
+}
+.book-tile .meta {
+	color: var(--muted);
+	font-size: 13px;
+	font-family: var(--mono);
+}
+
+label {
+	display: block;
+	font-family: var(--mono);
+	font-size: 12px;
+	color: var(--muted);
+	margin: 12px 0 4px;
+}
+input,
+select,
+textarea {
+	width: 100%;
+	background: var(--panel-2);
+	border: 1px solid var(--line);
+	color: var(--ink);
+	border-radius: 8px;
+	padding: 9px 11px;
+	font: inherit;
+}
+textarea {
+	font-family: var(--mono);
+	font-size: 13px;
+	line-height: 1.55;
+	resize: vertical;
+	min-height: 160px;
+}
+input:focus,
+textarea:focus,
+select:focus {
+	outline: none;
+	border-color: var(--accent);
+}
+
+.btn {
+	display: inline-block;
+	background: var(--accent);
+	color: var(--accent-ink);
+	border: none;
+	border-radius: 8px;
+	padding: 9px 16px;
+	font-family: var(--mono);
+	font-size: 13px;
+	font-weight: 700;
+	cursor: pointer;
+}
+.btn:hover {
+	filter: brightness(1.06);
+}
+.btn.ghost {
+	background: transparent;
+	color: var(--ink);
+	border: 1px solid var(--line);
+}
+.btn.danger {
+	background: transparent;
+	color: var(--danger);
+	border: 1px solid var(--line);
+}
+.btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+.row {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+	align-items: center;
+}
+
+.pill {
+	font-family: var(--mono);
+	font-size: 11px;
+	padding: 2px 8px;
+	border-radius: 999px;
+	border: 1px solid var(--line);
+	color: var(--muted);
+}
+.pill.on {
+	color: var(--ok);
+	border-color: var(--ok);
+}
+
+.warn {
+	border: 1px solid var(--danger);
+	background: rgba(224, 108, 108, 0.08);
+	color: var(--ink);
+	border-radius: var(--radius);
+	padding: 12px 14px;
+	margin: 14px 0;
+	font-size: 14px;
+}
+.warn code {
+	color: var(--danger);
+}
+.note {
+	color: var(--muted);
+	font-size: 13px;
+}
+.mono {
+	font-family: var(--mono);
+	font-size: 12px;
+}
+
+.tabs {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+	margin: 8px 0 18px;
+}
+.tabs a {
+	padding: 6px 12px;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 12px;
+}
+.tabs a.active {
+	color: var(--accent-ink);
+	background: var(--accent);
+	border-color: var(--accent);
+}
+
+.toast {
+	position: fixed;
+	bottom: 18px;
+	left: 50%;
+	transform: translateX(-50%);
+	background: var(--panel-2);
+	border: 1px solid var(--line);
+	padding: 10px 16px;
+	border-radius: 8px;
+	font-family: var(--mono);
+	font-size: 13px;
+	display: none;
+}
+.toast.show {
+	display: block;
+}
+.toast.err {
+	border-color: var(--danger);
+	color: var(--danger);
+}
+
+.split {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 14px;
+}
+@media (max-width: 760px) {
+	.split {
+		grid-template-columns: 1fr;
+	}
+}
+.spin {
+	opacity: 0.6;
+}

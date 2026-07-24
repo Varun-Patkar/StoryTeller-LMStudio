@@ -1,0 +1,56 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import BookTabs from "../../../components/BookTabs.astro";
+import { getBook, readBookFile } from "../../../lib/books.js";
+
+const { slug } = Astro.params;
+const book = await getBook(slug);
+if (!book) return Astro.redirect("/");
+const plan = await readBookFile(slug, "plan.md");
+---
+
+<Layout title={`Plan · ${book.title}`}>
+  <h1>{book.title}</h1>
+  <p class="sub mono">{book.slug}</p>
+  <BookTabs slug={slug} active="plan" />
+
+  <div class="card">
+    <h2>plan.md</h2>
+    <p class="note">The one file the model authors — from <em>your</em> plan-prompt, config, memory, and samples.
+      Generate it, then edit freely. Chapters are written from slices of this plan.</p>
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn" id="gen">Generate plan</button>
+      <button class="btn ghost" id="save">Save</button>
+      <span class="note" id="status"></span>
+    </div>
+    <textarea id="editor" style="min-height:480px" set:text={plan}></textarea>
+  </div>
+  <div class="toast" id="toast"></div>
+</Layout>
+
+<script define:vars={{ slug }}>
+  const $ = (id) => document.getElementById(id);
+  const toast = (m, e = false) => { const t = $("toast"); t.textContent = m; t.className = "toast show" + (e ? " err" : ""); setTimeout(() => (t.className = "toast"), 2600); };
+
+  $("gen").addEventListener("click", async () => {
+    $("status").textContent = "Generating from your prompts…";
+    $("gen").disabled = true;
+    try {
+      const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, task: "plan" }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed.");
+      $("editor").value = data.text;
+      $("status").textContent = "Draft in editor — review, edit, then Save.";
+    } catch (err) {
+      $("status").textContent = "";
+      toast(err.message, true);
+    } finally {
+      $("gen").disabled = false;
+    }
+  });
+
+  $("save").addEventListener("click", async () => {
+    const res = await fetch("/api/file", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, rel: "plan.md", content: $("editor").value }) });
+    toast(res.ok ? "Saved." : "Save failed.", !res.ok);
+  });
+</script>

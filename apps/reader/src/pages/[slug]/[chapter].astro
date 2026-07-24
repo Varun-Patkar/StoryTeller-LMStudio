@@ -1,0 +1,36 @@
+---
+import Reader from "../../layouts/Reader.astro";
+import { getBooks, getBookMeta, getChapters, getChapter } from "../../lib/books.js";
+
+export function getStaticPaths() {
+  const paths = [];
+  for (const b of getBooks()) {
+    for (const c of getChapters(b.slug)) {
+      paths.push({ params: { slug: b.slug, chapter: String(c.number) } });
+    }
+  }
+  return paths;
+}
+
+const { slug, chapter } = Astro.params;
+const meta = getBookMeta(slug);
+const ch = getChapter(slug, chapter);
+const base = import.meta.env.BASE_URL;
+const href = (p) => `${base}${p}`.replace(/([^:]\/)\/+/g, "$1");
+---
+
+<Reader title={`${ch.title} · ${meta.title}`}>
+  <div class="container wide">
+    <div class="crumbs">
+      <a href={href("")}>Library</a> / <a href={href(slug)}>{meta.title}</a> / {ch.title}
+    </div>
+    <article class="chapter">
+      <h1>{ch.title}</h1>
+      <Fragment set:html={ch.html} />
+    </article>
+    <nav class="nav">
+      {ch.prev ? <a href={href(`${slug}/${ch.prev.number}`)}>← {ch.prev.title}</a> : <span></span>}
+      {ch.next ? <a href={href(`${slug}/${ch.next.number}`)}>{ch.next.title} →</a> : <a href={href(slug)}>Contents</a>}
+    </nav>
+  </div>
+</Reader>

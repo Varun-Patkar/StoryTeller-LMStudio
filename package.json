@@ -1,0 +1,19 @@
+{
+	"name": "storyteller-lmstudio",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Local LM Studio-powered story-generation engine + Astro reader. The golden rule: nothing AI-generated is ever sent to LM Studio to write the story. You bring every prompt, sample, and piece of world memory by hand.",
+	"workspaces": [
+		"apps/engine",
+		"apps/reader"
+	],
+	"scripts": {
+		"engine": "npm run dev --workspace apps/engine",
+		"reader": "npm run dev --workspace apps/reader",
+		"reader:build": "npm run build --workspace apps/reader",
+		"reader:preview": "npm run preview --workspace apps/reader"
+	},
+	"engines": {
+		"node": ">=18.17.0"
+	}
+}

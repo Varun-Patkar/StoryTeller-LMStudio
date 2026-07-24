@@ -1,0 +1,132 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { loadSettings } from "../lib/settings.js";
+const s = await loadSettings();
+---
+
+<Layout title="Settings · StoryTeller Engine">
+  <h1>Settings</h1>
+  <p class="sub">Point the engine at your LM Studio server, then load a model.</p>
+
+  <div class="card">
+    <h2>LM Studio connection</h2>
+    <div class="split">
+      <div>
+        <label for="baseUrl">Base URL</label>
+        <input id="baseUrl" value={s.baseUrl} placeholder="http://localhost:1234" />
+      </div>
+      <div>
+        <label for="apiKey">API key (optional)</label>
+        <input id="apiKey" value={s.apiKey} type="password" placeholder="leave blank if none" />
+      </div>
+    </div>
+    <div class="split">
+      <div>
+        <label for="mode">Generation mode</label>
+        <select id="mode">
+          <option value="completions" selected={s.mode === "completions"}>Completions — purest style mimicry (recommended)</option>
+          <option value="chat" selected={s.mode === "chat"}>Chat — fallback</option>
+        </select>
+      </div>
+      <div>
+        <label for="model">Default model (sent as `model`)</label>
+        <input id="model" value={s.model} placeholder="pick one below to auto-fill" />
+      </div>
+    </div>
+    <div class="split">
+      <div>
+        <label for="temperature">Temperature</label>
+        <input id="temperature" type="number" step="0.05" value={s.temperature} />
+      </div>
+      <div>
+        <label for="maxTokens">Max tokens</label>
+        <input id="maxTokens" type="number" step="128" value={s.maxTokens} />
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" id="save">Save</button>
+      <button class="btn ghost" id="refresh">Refresh models</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Models</h2>
+    <p class="note">Downloaded chat models in LM Studio. Load one before generating.</p>
+    <div id="models"><p class="note">Save the connection, then Refresh models.</p></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</Layout>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const toast = (msg, err = false) => {
+    const t = $("toast"); t.textContent = msg; t.className = "toast show" + (err ? " err" : "");
+    setTimeout(() => (t.className = "toast"), 2600);
+  };
+
+  function collect() {
+    return {
+      baseUrl: $("baseUrl").value.trim(),
+      apiKey: $("apiKey").value,
+      mode: $("mode").value,
+      model: $("model").value.trim(),
+      temperature: parseFloat($("temperature").value),
+      maxTokens: parseInt($("maxTokens").value, 10),
+    };
+  }
+
+  async function save() {
+    const res = await fetch("/api/settings", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(collect()),
+    });
+    if (!res.ok) return toast("Save failed.", true);
+    toast("Saved.");
+  }
+
+  async function refresh() {
+    const box = $("models");
+    box.innerHTML = '<p class="note spin">Loading…</p>';
+    const res = await fetch("/api/models");
+    const data = await res.json();
+    if (!res.ok) { box.innerHTML = `<p class="warn">${data.error}</p>`; return; }
+    if (!data.models.length) { box.innerHTML = '<p class="note">No models found.</p>'; return; }
+    box.innerHTML = "";
+    for (const m of data.models) {
+      const row = document.createElement("div");
+      row.className = "row";
+      row.style.justifyContent = "space-between";
+      row.style.borderTop = "1px solid var(--line)";
+      row.style.padding = "10px 0";
+      row.innerHTML = `
+        <div><div>${m.displayName}</div><div class="mono">${m.key}</div></div>
+        <div class="row">
+          <span class="pill ${m.loaded ? "on" : ""}">${m.loaded ? "loaded" : "idle"}</span>
+          <button class="btn ghost" data-use="${m.key}">Use</button>
+          <button class="btn" data-load="${m.key}">${m.loaded ? "Reload" : "Load"}</button>
+          ${m.loaded ? `<button class="btn danger" data-unload="${m.key}">Unload</button>` : ""}
+        </div>`;
+      box.appendChild(row);
+    }
+    box.querySelectorAll("[data-use]").forEach((b) =>
+      b.addEventListener("click", () => { $("model").value = b.dataset.use; toast("Set as default model — remember to Save."); }));
+    box.querySelectorAll("[data-load]").forEach((b) =>
+      b.addEventListener("click", () => act("load", b.dataset.load)));
+    box.querySelectorAll("[data-unload]").forEach((b) =>
+      b.addEventListener("click", () => act("unload", b.dataset.unload)));
+  }
+
+  async function act(action, model) {
+    toast(action === "load" ? "Loading model…" : "Unloading…");
+    const res = await fetch("/api/models", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, model }),
+    });
+    const data = await res.json();
+    if (!res.ok) return toast(data.error || "Failed.", true);
+    toast("Done.");
+    refresh();
+  }
+
+  $("save").addEventListener("click", save);
+  $("refresh").addEventListener("click", refresh);
+</script>

@@ -1,0 +1,50 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import BookTabs from "../../../components/BookTabs.astro";
+import { getBook, listChapters } from "../../../lib/books.js";
+
+const { slug } = Astro.params;
+const book = await getBook(slug);
+if (!book) return Astro.redirect("/");
+const chapters = await listChapters(slug);
+const nextNumber = chapters.length ? Math.max(...chapters.map((c) => c.number)) + 1 : 1;
+---
+
+<Layout title={`${book.title} · StoryTeller Engine`}>
+  <h1>{book.title}</h1>
+  <p class="sub mono">{book.slug}</p>
+  <BookTabs slug={slug} active="overview" />
+
+  {book.lint.length > 0 && (
+    <div class="warn">
+      <strong>Unedited prompt drafts.</strong> These still carry the AI-draft marker — rewrite
+      them in your own words before generating anything you care about:
+      <ul>{book.lint.map((f) => <li><code>{f}</code></li>)}</ul>
+    </div>
+  )}
+
+  <div class="card">
+    <h2>Chapters</h2>
+    {chapters.length === 0 && <p class="note">No chapters yet.</p>}
+    {chapters.map((c) => (
+      <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding:10px 0">
+        <div><strong>Chapter {c.number}</strong> · <span class="note">{c.title}</span></div>
+        <a class="btn ghost" href={`/book/${slug}/chapter/${c.number}`}>Open</a>
+      </div>
+    ))}
+    <div style="margin-top:14px">
+      <a class="btn" href={`/book/${slug}/chapter/${nextNumber}`}>Write chapter {nextNumber}</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Flow</h2>
+    <ol class="note">
+      <li><a href={`/book/${slug}/config`}>Config</a> — your story settings.</li>
+      <li><a href={`/book/${slug}/memory`}>Memory</a> — characters, events, locations (human-written).</li>
+      <li><a href={`/book/${slug}/prompts`}>Prompts</a> — replace the AI drafts with your own words; add samples.</li>
+      <li><a href={`/book/${slug}/plan`}>Plan</a> — generate from your plan-prompt, then edit.</li>
+      <li>Write chapters — draft from your chapter-prompt + the plan slice, then edit and rewrite by comment.</li>
+    </ol>
+  </div>
+</Layout>

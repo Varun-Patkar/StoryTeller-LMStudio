@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.astro/
+
+# Local engine settings (LM Studio URL, API key, selected model)
+.storyteller/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.log

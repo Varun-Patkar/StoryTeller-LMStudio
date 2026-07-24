@@ -1,0 +1,19 @@
+{
+  "name": "@storyteller/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-only story-generation engine. NEVER deployed. Talks to LM Studio and writes books/.",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/node": "^8.3.4",
+    "@lmstudio/sdk": "^1.0.0",
+    "astro": "^4.16.18",
+    "gray-matter": "^4.0.3"
+  }
+}

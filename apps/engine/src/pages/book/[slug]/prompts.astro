@@ -1,0 +1,111 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import BookTabs from "../../../components/BookTabs.astro";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { getBook, readBookFile } from "../../../lib/books.js";
+import { BOOKS_DIR } from "../../../lib/paths.js";
+
+const { slug } = Astro.params;
+const book = await getBook(slug);
+if (!book) return Astro.redirect("/");
+
+const promptFiles = [
+  { rel: "prompts/system.md", label: "System prompt", note: "AI placeholder — replace it. Leave empty to send no system framing." },
+  { rel: "prompts/plan-prompt.md", label: "Plan prompt", note: "Your instruction for generating the plan." },
+  { rel: "prompts/chapter-prompt.md", label: "Chapter prompt", note: "Your instruction for writing a chapter." },
+  { rel: "prompts/rewrite-prompt.md", label: "Rewrite prompt", note: "Your instruction for revising text from a note." },
+];
+for (const p of promptFiles) p.content = await readBookFile(slug, p.rel);
+
+let sampleFiles = [];
+try {
+  const dir = path.join(BOOKS_DIR, book.slug, "prompts", "samples");
+  sampleFiles = (await fs.readdir(dir)).filter((f) => f.endsWith(".md")).sort();
+} catch {}
+---
+
+<Layout title={`Prompts · ${book.title}`}>
+  <h1>{book.title}</h1>
+  <p class="sub mono">{book.slug}</p>
+  <BookTabs slug={slug} active="prompts" />
+
+  {book.lint.length > 0 && (
+    <div class="warn"><strong>Still AI drafts:</strong> {book.lint.map((f) => <code>{f} </code>)} — rewrite in your own words.</div>
+  )}
+
+  {promptFiles.map((p) => (
+    <div class="card">
+      <h2>{p.label} <span class="mono note">— {p.rel}</span></h2>
+      <p class="note">{p.note}</p>
+      <textarea data-file={p.rel} set:text={p.content}></textarea>
+      <div class="row" style="margin-top:10px"><button class="btn" data-save={p.rel}>Save</button></div>
+    </div>
+  ))}
+
+  <div class="card">
+    <h2>Writing samples <span class="mono note">— prompts/samples/</span></h2>
+    <p class="note">Your reference prose. This teaches the model your voice more than any instruction. Add a few passages you wrote yourself.</p>
+    <div id="samples">
+      {sampleFiles.length === 0 && <p class="note">No samples yet.</p>}
+      {sampleFiles.map((f) => (
+        <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding:8px 0">
+          <a href="#" data-open={`prompts/samples/${f}`}>{f}</a>
+          <button class="btn danger" data-del={`prompts/samples/${f}`}>✕</button>
+        </div>
+      ))}
+    </div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost" id="add-sample">+ add sample</button></div>
+
+    <div id="sample-editor" style="display:none;margin-top:14px">
+      <label id="sample-path"></label>
+      <textarea id="sample-text" style="min-height:220px"></textarea>
+      <div class="row" style="margin-top:10px"><button class="btn" id="sample-save">Save sample</button></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</Layout>
+
+<script define:vars={{ slug }}>
+  const $ = (id) => document.getElementById(id);
+  const toast = (m, e = false) => { const t = $("toast"); t.textContent = m; t.className = "toast show" + (e ? " err" : ""); setTimeout(() => (t.className = "toast"), 2200); };
+  const put = (rel, content) => fetch("/api/file", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, rel, content }) });
+
+  document.querySelectorAll("[data-save]").forEach((b) => b.addEventListener("click", async () => {
+    const rel = b.dataset.save;
+    const ta = document.querySelector(`textarea[data-file="${rel}"]`);
+    const res = await put(rel, ta.value);
+    toast(res.ok ? "Saved." : "Save failed.", !res.ok);
+  }));
+
+  // samples
+  let sampleRel = null;
+  async function openSample(rel) {
+    const res = await fetch(`/api/file?slug=${encodeURIComponent(slug)}&rel=${encodeURIComponent(rel)}`);
+    const data = await res.json();
+    sampleRel = rel;
+    $("sample-editor").style.display = "block";
+    $("sample-path").textContent = rel;
+    $("sample-text").value = data.content;
+  }
+  document.querySelectorAll("[data-open]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); openSample(a.dataset.open); }));
+  document.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => {
+    if (!confirm(`Delete ${b.dataset.del}?`)) return;
+    const res = await fetch("/api/file", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, rel: b.dataset.del }) });
+    if (res.ok) location.reload(); else toast("Delete failed.", true);
+  }));
+  $("add-sample").addEventListener("click", async () => {
+    const name = prompt("New sample — file name (without .md):");
+    if (!name) return;
+    const clean = name.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+    if (!clean) return toast("Invalid name.", true);
+    const res = await put(`prompts/samples/${clean}.md`, "");
+    if (res.ok) location.reload(); else toast("Create failed.", true);
+  });
+  $("sample-save").addEventListener("click", async () => {
+    if (!sampleRel) return;
+    const res = await put(sampleRel, $("sample-text").value);
+    toast(res.ok ? "Saved." : "Save failed.", !res.ok);
+  });
+</script>

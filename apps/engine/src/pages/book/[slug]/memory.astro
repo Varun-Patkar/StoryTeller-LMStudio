@@ -1,0 +1,98 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import BookTabs from "../../../components/BookTabs.astro";
+import { getBook, listMemory, memoryCategories } from "../../../lib/books.js";
+
+const { slug } = Astro.params;
+const book = await getBook(slug);
+if (!book) return Astro.redirect("/");
+const categories = memoryCategories();
+const memory = await listMemory(slug);
+---
+
+<Layout title={`Memory · ${book.title}`}>
+  <h1>{book.title}</h1>
+  <p class="sub mono">{book.slug}</p>
+  <BookTabs slug={slug} active="memory" />
+
+  <p class="note">Human-written memory the model is grounded in. Keep each entry to what must stay
+    true across chapters — not a biography.</p>
+
+  <div class="split">
+    <div class="card">
+      <h2>Entries</h2>
+      <div id="tree">
+        {categories.map((cat) => (
+          <div style="margin-bottom:12px">
+            <div class="mono" style="color:var(--accent)">{cat}/</div>
+            {memory[cat].length === 0 && <div class="note" style="padding-left:12px">— empty —</div>}
+            {memory[cat].map((f) => (
+              <div class="row" style="justify-content:space-between;padding:5px 0 5px 12px">
+                <a href="#" data-open={`memory/${cat}/${f}`}>{f}</a>
+                <button class="btn danger" data-del={`memory/${cat}/${f}`}>✕</button>
+              </div>
+            ))}
+            <button class="btn ghost" data-add={cat} style="margin:6px 0 0 12px">+ add</button>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 id="editing">Editor</h2>
+      <p class="note" id="editing-path">Pick an entry, or add one.</p>
+      <textarea id="editor" style="min-height:420px" disabled></textarea>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="save" disabled>Save</button>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+</Layout>
+
+<script define:vars={{ slug }}>
+  const $ = (id) => document.getElementById(id);
+  const toast = (m, e = false) => { const t = $("toast"); t.textContent = m; t.className = "toast show" + (e ? " err" : ""); setTimeout(() => (t.className = "toast"), 2200); };
+  let currentRel = null;
+
+  async function open(rel) {
+    const res = await fetch(`/api/file?slug=${encodeURIComponent(slug)}&rel=${encodeURIComponent(rel)}`);
+    const data = await res.json();
+    if (!res.ok) return toast(data.error, true);
+    currentRel = rel;
+    $("editing-path").textContent = rel;
+    $("editor").value = data.content;
+    $("editor").disabled = false;
+    $("save").disabled = false;
+  }
+
+  async function save() {
+    if (!currentRel) return;
+    const res = await fetch("/api/file", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, rel: currentRel, content: $("editor").value }) });
+    toast(res.ok ? "Saved." : "Save failed.", !res.ok);
+  }
+
+  async function add(cat) {
+    const name = prompt(`New ${cat} entry — file name (without .md):`);
+    if (!name) return;
+    const clean = name.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+    if (!clean) return toast("Invalid name.", true);
+    const rel = `memory/${cat}/${clean}.md`;
+    const seed = `---\nname: ${name}\n---\n\n# ${name}\n\n- \n`;
+    const res = await fetch("/api/file", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, rel, content: seed }) });
+    if (!res.ok) return toast("Create failed.", true);
+    location.reload();
+  }
+
+  async function del(rel) {
+    if (!confirm(`Delete ${rel}?`)) return;
+    const res = await fetch("/api/file", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, rel }) });
+    if (!res.ok) return toast("Delete failed.", true);
+    location.reload();
+  }
+
+  document.querySelectorAll("[data-open]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); open(a.dataset.open); }));
+  document.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => add(b.dataset.add)));
+  document.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => del(b.dataset.del)));
+  $("save").addEventListener("click", save);
+</script>
