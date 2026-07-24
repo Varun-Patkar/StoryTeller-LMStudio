@@ -1,21 +1,71 @@
+/* ============================================================
+   StoryTeller Reader — neutral gray chrome + amber accent,
+   with a Kindle-style reading surface and switchable reader
+   themes (white / cream / sepia / dark / black).
+
+   Palette mirrors the StoryTeller-Github-Agents reader:
+   Tailwind neutral-* for chrome, amber-* for accents.
+   ============================================================ */
+
 :root {
-	--bg: #f6f2ea;
-	--ink: #221f1b;
-	--muted: #6b6459;
-	--line: #e0d8ca;
-	--accent: #9a6a2f;
-	--paper: #fffdf8;
+	/* Chrome (light mode): neutral gray + amber accent */
+	--bg: #fafafa; /* neutral-50 */
+	--ink: #171717; /* neutral-900 */
+	--muted: #737373; /* neutral-500 */
+	--line: #e5e5e5; /* neutral-200 */
+	--accent: #b45309; /* amber-700 (readable on light) */
+	--card: #ffffff;
+	--card-2: #f5f5f5; /* neutral-100 */
 	--maxw: 42rem;
+
+	/* Reading surface ("paper") — overridden by [data-reader-theme] */
+	--paper: #ffffff;
+	--paper-ink: #1a1a1a;
+	--paper-accent: #b45309;
+
+	/* Reader typography — set inline by the settings script, with fallbacks */
+	--reader-font: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+	--reader-size: 18px;
+	--reader-lh: 1.75;
+	--reader-width: 42rem;
 }
-@media (prefers-color-scheme: dark) {
-	:root {
-		--bg: #16130f;
-		--ink: #e8e0d3;
-		--muted: #9c9384;
-		--line: #2c2620;
-		--accent: #d8a657;
-		--paper: #1c1813;
-	}
+
+/* Dark chrome */
+html.dark {
+	--bg: #0a0a0a; /* neutral-950 */
+	--ink: #f5f5f5; /* neutral-100 */
+	--muted: #a3a3a3; /* neutral-400 */
+	--line: #262626; /* neutral-800 */
+	--accent: #fbbf24; /* amber-400 */
+	--card: #171717; /* neutral-900 */
+	--card-2: #262626; /* neutral-800 */
+}
+
+/* ── Reader themes: the actual reading surface ─────────────── */
+html[data-reader-theme="white"] {
+	--paper: #ffffff;
+	--paper-ink: #1a1a1a;
+	--paper-accent: #b45309;
+}
+html[data-reader-theme="cream"] {
+	--paper: #faf8f1;
+	--paper-ink: #1a1a1a;
+	--paper-accent: #b45309;
+}
+html[data-reader-theme="sepia"] {
+	--paper: #f4ecd8;
+	--paper-ink: #5b4636;
+	--paper-accent: #8a5a2b;
+}
+html[data-reader-theme="dark"] {
+	--paper: #1a1a1a;
+	--paper-ink: #d4d4d4;
+	--paper-accent: #fbbf24;
+}
+html[data-reader-theme="black"] {
+	--paper: #000000;
+	--paper-ink: #e5e5e5;
+	--paper-accent: #fbbf24;
 }
 
 * {
@@ -29,26 +79,96 @@ body {
 	background: var(--bg);
 	color: var(--ink);
 	font:
-		18px/1.75 ui-serif,
-		Georgia,
-		"Iowan Old Style",
-		"Times New Roman",
-		serif;
+		16px/1.6 ui-sans-serif,
+		system-ui,
+		-apple-system,
+		"Segoe UI",
+		sans-serif;
+	transition:
+		background-color 200ms ease,
+		color 200ms ease;
 }
+
+/* When reading a chapter the whole page adopts the reader (paper) theme. */
+body.reading {
+	background: var(--paper);
+	color: var(--paper-ink);
+}
+
 a {
 	color: var(--accent);
 }
 
+/* ── Top bar ──────────────────────────────────────────────── */
 .rtop {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
 	border-bottom: 1px solid var(--line);
-	padding: 14px 20px;
+	padding: 12px 20px;
+	background: var(--bg);
+}
+body.reading .rtop {
+	background: color-mix(in srgb, var(--paper) 92%, var(--paper-ink));
+	border-bottom-color: color-mix(in srgb, var(--paper-ink) 15%, transparent);
 }
 .rbrand {
 	font-weight: 700;
 	text-decoration: none;
 	letter-spacing: 0.3px;
+	color: inherit;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+.rbrand:hover {
+	opacity: 0.8;
+}
+.ractions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
 }
 
+/* Icon buttons in the top bar / settings */
+.icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border: 1px solid transparent;
+	border-radius: 10px;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+	padding: 0;
+}
+.icon-btn:hover {
+	background: var(--card-2);
+}
+.icon-btn svg {
+	width: 20px;
+	height: 20px;
+}
+.theme-icon-sun {
+	display: none;
+}
+html.dark .theme-icon-sun {
+	display: block;
+}
+html.dark .theme-icon-moon {
+	display: none;
+}
+
+/* On the reading surface the chrome follows the reader-theme setting,
+   so the standalone light/dark toggle is hidden there. */
+body.reading #theme-toggle {
+	display: none;
+}
+
+/* ── Layout ───────────────────────────────────────────────── */
 .container {
 	max-width: var(--maxw);
 	margin: 0 auto;
@@ -56,6 +176,11 @@ a {
 }
 .wide {
 	max-width: 52rem;
+}
+
+/* On the reading surface the inner elements control width via --reader-width. */
+body.reading .container {
+	max-width: none;
 }
 
 h1 {
@@ -74,6 +199,7 @@ h2 {
 	font-size: 0.85rem;
 }
 
+/* ── Library list ─────────────────────────────────────────── */
 .booklist {
 	list-style: none;
 	padding: 0;
@@ -89,6 +215,7 @@ h2 {
 	margin: 0 0 4px;
 }
 
+/* ── Table of contents ────────────────────────────────────── */
 .toc {
 	list-style: none;
 	padding: 0;
@@ -111,11 +238,14 @@ h2 {
 	font-variant-numeric: tabular-nums;
 }
 
+/* ── Chapter reading surface ──────────────────────────────── */
 .chapter {
-	background: var(--paper);
-	border: 1px solid var(--line);
-	border-radius: 12px;
-	padding: clamp(24px, 5vw, 56px);
+	max-width: var(--reader-width);
+	margin: 0 auto;
+	font-family: var(--reader-font);
+	font-size: var(--reader-size);
+	line-height: var(--reader-lh);
+	color: var(--paper-ink);
 }
 .chapter h1 {
 	margin-bottom: 24px;
@@ -128,26 +258,187 @@ h2 {
 	line-height: 0.8;
 	float: left;
 	padding: 6px 10px 0 0;
-	color: var(--accent);
+	color: var(--paper-accent);
 }
 
+/* ── Chapter nav / crumbs ─────────────────────────────────── */
 .nav {
 	display: flex;
 	justify-content: space-between;
 	gap: 12px;
 	margin-top: 28px;
+	max-width: var(--reader-width);
+	margin-left: auto;
+	margin-right: auto;
 }
 .nav a {
 	text-decoration: none;
 	padding: 8px 14px;
-	border: 1px solid var(--line);
+	border: 1px solid color-mix(in srgb, var(--paper-ink) 25%, transparent);
 	border-radius: 999px;
 	font-size: 0.9rem;
+	color: var(--paper-ink);
+}
+.nav a:hover {
+	border-color: var(--paper-accent);
+	color: var(--paper-accent);
 }
 .crumbs {
 	font-size: 0.85rem;
 	margin-bottom: 18px;
+	max-width: var(--reader-width);
+	margin-left: auto;
+	margin-right: auto;
 }
 .crumbs a {
 	text-decoration: none;
+}
+
+/* ============================================================
+   Reading settings panel (Kindle-style controls)
+   ============================================================ */
+.settings-backdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.3);
+	z-index: 40;
+	display: none;
+}
+.settings-backdrop.open {
+	display: block;
+}
+
+.settings-panel {
+	position: fixed;
+	z-index: 50;
+	right: 16px;
+	top: 64px;
+	width: 320px;
+	max-width: calc(100vw - 32px);
+	max-height: 72vh;
+	overflow-y: auto;
+	background: var(--card);
+	color: var(--ink);
+	border: 1px solid var(--line);
+	border-radius: 16px;
+	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+	padding: 20px;
+	display: none;
+}
+.settings-panel.open {
+	display: block;
+}
+@media (max-width: 640px) {
+	.settings-panel {
+		right: 0;
+		left: 0;
+		bottom: 0;
+		top: auto;
+		width: 100%;
+		max-width: 100%;
+		border-radius: 16px 16px 0 0;
+	}
+}
+
+.settings-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 14px;
+}
+.settings-head h3 {
+	margin: 0;
+	font-size: 0.95rem;
+	font-family: ui-sans-serif, system-ui, sans-serif;
+}
+.settings-group {
+	margin-bottom: 18px;
+}
+.settings-group > label {
+	display: block;
+	font-size: 0.72rem;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	color: var(--muted);
+	margin-bottom: 8px;
+	font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Segmented button rows (font family, column width) */
+.seg {
+	display: grid;
+	gap: 8px;
+}
+.seg.cols-3 {
+	grid-template-columns: repeat(3, 1fr);
+}
+.seg button {
+	font-size: 0.78rem;
+	padding: 8px 6px;
+	border-radius: 10px;
+	border: 1px solid var(--line);
+	background: transparent;
+	color: var(--ink);
+	cursor: pointer;
+	transition:
+		background-color 120ms ease,
+		border-color 120ms ease;
+}
+.seg button:hover {
+	background: var(--card-2);
+}
+.seg button.active {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #0a0a0a;
+	font-weight: 600;
+}
+
+/* Stepper rows (font size, line height) */
+.stepper {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.stepper input[type="range"] {
+	flex: 1;
+	accent-color: var(--accent);
+}
+.step-btn {
+	width: 30px;
+	height: 30px;
+	border-radius: 8px;
+	border: 1px solid var(--line);
+	background: transparent;
+	color: var(--ink);
+	cursor: pointer;
+	font-size: 1rem;
+	line-height: 1;
+}
+.step-btn:hover {
+	background: var(--card-2);
+}
+
+/* Reader theme swatches */
+.theme-dots {
+	display: flex;
+	gap: 10px;
+}
+.theme-dot {
+	width: 32px;
+	height: 32px;
+	border-radius: 999px;
+	border: 2px solid var(--line);
+	cursor: pointer;
+	padding: 0;
+	transition:
+		transform 120ms ease,
+		border-color 120ms ease;
+}
+.theme-dot:hover {
+	transform: scale(1.08);
+}
+.theme-dot.active {
+	border-color: var(--accent);
+	transform: scale(1.12);
 }

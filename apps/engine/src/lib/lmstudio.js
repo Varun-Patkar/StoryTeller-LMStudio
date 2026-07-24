@@ -73,19 +73,47 @@ export async function unloadModel(settings, modelKey) {
 }
 
 /**
+ * Ensure a model is loaded before generation (just-in-time loading).
+ * If the model is already loaded, this is a no-op. Otherwise it is loaded with
+ * the given context length (if provided). No-op when modelKey is falsy.
+ */
+export async function ensureLoaded(settings, modelKey, contextLength) {
+	if (!modelKey) return { ok: true, skipped: true };
+	const client = getClient(settings);
+	let loaded = [];
+	try {
+		loaded = await client.llm.listLoaded();
+	} catch {
+		loaded = [];
+	}
+	const loadedKeys = new Set(
+		loaded.map((m) => m.identifier || m.modelKey || m.path),
+	);
+	if (loadedKeys.has(modelKey)) return { ok: true, alreadyLoaded: true };
+	const config = {};
+	if (contextLength) config.contextLength = Number(contextLength);
+	await client.llm.load(
+		modelKey,
+		Object.keys(config).length ? { config } : undefined,
+	);
+	return { ok: true, loaded: true };
+}
+
+/**
  * Generate text via LM Studio's OpenAI-compatible REST API.
  * mode "completions" sends the raw prompt (purest style mimicry, no chat template).
  * mode "chat" wraps it as a chat request with an optional system message.
  * Returns the full generated string (non-streaming).
+ * `model` overrides settings.model for this single request (chosen per generation).
  */
-export async function generate(settings, { prompt, system = "" }) {
+export async function generate(settings, { prompt, system = "", model }) {
 	const base = normaliseHttp(settings.baseUrl);
 	const headers = { "Content-Type": "application/json" };
 	if (settings.apiKey) headers["Authorization"] = `Bearer ${settings.apiKey}`;
 
 	const temperature = Number(settings.temperature ?? 0.9);
 	const max_tokens = Number(settings.maxTokens ?? 4096);
-	const model = settings.model || undefined;
+	const modelName = model || settings.model || undefined;
 
 	if ((settings.mode || "completions") === "chat") {
 		const messages = [];
@@ -96,7 +124,7 @@ export async function generate(settings, { prompt, system = "" }) {
 			method: "POST",
 			headers,
 			body: JSON.stringify({
-				model,
+				model: modelName,
 				messages,
 				temperature,
 				max_tokens,
@@ -118,7 +146,7 @@ export async function generate(settings, { prompt, system = "" }) {
 		method: "POST",
 		headers,
 		body: JSON.stringify({
-			model,
+			model: modelName,
 			prompt: fullPrompt,
 			temperature,
 			max_tokens,

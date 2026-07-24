@@ -1,16 +1,31 @@
 :root {
-	--bg: #14110f;
-	--panel: #1d1916;
-	--panel-2: #262019;
-	--ink: #efe7dc;
-	--muted: #a89a88;
-	--line: #37302a;
-	--accent: #d8a657;
-	--accent-ink: #14110f;
-	--danger: #e06c6c;
-	--ok: #8ec07c;
+	/* Light theme (default) — neutral gray + amber accent. */
+	--bg: #fafafa; /* neutral-50 */
+	--panel: #ffffff;
+	--panel-2: #f1f1f1; /* ~neutral-100 */
+	--ink: #171717; /* neutral-900 */
+	--muted: #6b6b6b; /* neutral-500-ish */
+	--line: #e5e5e5; /* neutral-200 */
+	--accent: #b45309; /* amber-700 (readable on light) */
+	--accent-ink: #ffffff;
+	--danger: #dc2626; /* red-600 */
+	--ok: #16a34a; /* green-600 */
 	--radius: 10px;
 	--mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+}
+
+/* Dark theme */
+html.dark {
+	--bg: #0a0a0a; /* neutral-950 */
+	--panel: #171717; /* neutral-900 */
+	--panel-2: #262626; /* neutral-800 */
+	--ink: #f5f5f5; /* neutral-100 */
+	--muted: #a3a3a3; /* neutral-400 */
+	--line: #2e2e2e; /* between neutral-800/700 */
+	--accent: #f59e0b; /* amber-500 */
+	--accent-ink: #0a0a0a;
+	--danger: #ef4444; /* red-500 */
+	--ok: #22c55e; /* green-500 */
 }
 
 * {
@@ -28,6 +43,9 @@ body {
 		Georgia,
 		"Times New Roman",
 		serif;
+	transition:
+		background-color 200ms ease,
+		color 200ms ease;
 }
 a {
 	color: var(--accent);
@@ -58,6 +76,42 @@ a:hover {
 	color: var(--muted);
 	font-family: var(--mono);
 	font-size: 13px;
+}
+.topbar nav {
+	display: flex;
+	align-items: center;
+}
+
+/* Icon button (theme toggle) */
+.icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 34px;
+	margin-left: 14px;
+	padding: 0;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: transparent;
+	color: var(--ink);
+	cursor: pointer;
+}
+.icon-btn:hover {
+	background: var(--panel-2);
+}
+.icon-btn svg {
+	width: 18px;
+	height: 18px;
+}
+.theme-icon-sun {
+	display: none;
+}
+html.dark .theme-icon-sun {
+	display: block;
+}
+html.dark .theme-icon-moon {
+	display: none;
 }
 
 .wrap {
@@ -194,7 +248,7 @@ select:focus {
 
 .warn {
 	border: 1px solid var(--danger);
-	background: rgba(224, 108, 108, 0.08);
+	background: rgba(239, 68, 68, 0.08);
 	color: var(--ink);
 	border-radius: var(--radius);
 	padding: 12px 14px;

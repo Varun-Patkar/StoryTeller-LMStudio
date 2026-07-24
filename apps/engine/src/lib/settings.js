@@ -10,6 +10,9 @@ const DEFAULTS = {
 	mode: "completions",
 	temperature: 0.9,
 	maxTokens: 4096,
+	// Per-model context length used when a model is loaded just-in-time for generation.
+	// Shape: { [modelKey]: number }.
+	contextLengths: {},
 };
 
 export async function loadSettings() {

@@ -1,5 +1,5 @@
 import { loadSettings } from "../../lib/settings.js";
-import { generate } from "../../lib/lmstudio.js";
+import { generate, ensureLoaded } from "../../lib/lmstudio.js";
 import {
 	getSystemPrompt,
 	buildPlanPrompt,
@@ -34,7 +34,13 @@ export async function POST({ request }) {
 			return json({ error: "Unknown task" }, 400);
 		}
 
-		const text = await generate(settings, { prompt, system });
+		// The model chosen for this generation (falls back to the saved default).
+		const model = body.model || settings.model;
+		// Load it just-in-time with its configured context length, if not already loaded.
+		const contextLength = settings.contextLengths?.[model];
+		await ensureLoaded(settings, model, contextLength);
+
+		const text = await generate(settings, { prompt, system, model });
 		return json({ text, prompt });
 	} catch (err) {
 		return json({ error: err.message }, 502);

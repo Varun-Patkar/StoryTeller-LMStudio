@@ -2,11 +2,13 @@
 import Layout from "../../../layouts/Layout.astro";
 import BookTabs from "../../../components/BookTabs.astro";
 import { getBook, readBookFile } from "../../../lib/books.js";
+import { loadSettings } from "../../../lib/settings.js";
 
 const { slug } = Astro.params;
 const book = await getBook(slug);
 if (!book) return Astro.redirect("/");
 const plan = await readBookFile(slug, "plan.md");
+const settings = await loadSettings();
 ---
 
 <Layout title={`Plan · ${book.title}`}>
@@ -19,6 +21,8 @@ const plan = await readBookFile(slug, "plan.md");
     <p class="note">The one file the model authors — from <em>your</em> plan-prompt, config, memory, and samples.
       Generate it, then edit freely. Chapters are written from slices of this plan.</p>
     <div class="row" style="margin-bottom:10px">
+      <label for="model" class="mono" style="margin:0">Model</label>
+      <select id="model" style="width:auto;min-width:220px"></select>
       <button class="btn" id="gen">Generate plan</button>
       <button class="btn ghost" id="save">Save</button>
       <span class="note" id="status"></span>
@@ -28,15 +32,19 @@ const plan = await readBookFile(slug, "plan.md");
   <div class="toast" id="toast"></div>
 </Layout>
 
-<script define:vars={{ slug }}>
+<script is:inline src="/model-picker.js"></script>
+<script define:vars={{ slug, defaultModel: settings.model }}>
   const $ = (id) => document.getElementById(id);
   const toast = (m, e = false) => { const t = $("toast"); t.textContent = m; t.className = "toast show" + (e ? " err" : ""); setTimeout(() => (t.className = "toast"), 2600); };
+
+  // Populate the model dropdown (defaults to the saved model).
+  window.initModelPicker?.($("model"), defaultModel);
 
   $("gen").addEventListener("click", async () => {
     $("status").textContent = "Generating from your prompts…";
     $("gen").disabled = true;
     try {
-      const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, task: "plan" }) });
+      const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, task: "plan", model: $("model").value }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed.");
       $("editor").value = data.text;

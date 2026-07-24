@@ -6,7 +6,7 @@ const s = await loadSettings();
 
 <Layout title="Settings · StoryTeller Engine">
   <h1>Settings</h1>
-  <p class="sub">Point the engine at your LM Studio server, then load a model.</p>
+  <p class="sub">Point the engine at your LM Studio server. Models load on demand when you generate — no manual loading.</p>
 
   <div class="card">
     <h2>LM Studio connection</h2>
@@ -29,8 +29,8 @@ const s = await loadSettings();
         </select>
       </div>
       <div>
-        <label for="model">Default model (sent as `model`)</label>
-        <input id="model" value={s.model} placeholder="pick one below to auto-fill" />
+        <label for="model">Default model</label>
+        <select id="model"><option value={s.model} selected>{s.model || "— pick after refreshing —"}</option></select>
       </div>
     </div>
     <div class="split">
@@ -51,21 +51,32 @@ const s = await loadSettings();
 
   <div class="card">
     <h2>Models</h2>
-    <p class="note">Downloaded chat models in LM Studio. Load one before generating.</p>
+    <p class="note">Downloaded models in LM Studio. Set a context length per model (blank = LM Studio default).
+      The chosen model for each generation is loaded automatically at that time — no load buttons.</p>
     <div id="models"><p class="note">Save the connection, then Refresh models.</p></div>
   </div>
 
   <div class="toast" id="toast"></div>
 </Layout>
 
-<script>
+<script define:vars={{ initial: s }}>
   const $ = (id) => document.getElementById(id);
   const toast = (msg, err = false) => {
     const t = $("toast"); t.textContent = msg; t.className = "toast show" + (err ? " err" : "");
     setTimeout(() => (t.className = "toast"), 2600);
   };
 
+  // Per-model context lengths, kept in sync with the inputs below.
+  const contextLengths = { ...(initial.contextLengths || {}) };
+
   function collect() {
+    // Read the latest context-length inputs into the map.
+    document.querySelectorAll("[data-ctx]").forEach((inp) => {
+      const key = inp.dataset.ctx;
+      const val = parseInt(inp.value, 10);
+      if (Number.isFinite(val) && val > 0) contextLengths[key] = val;
+      else delete contextLengths[key];
+    });
     return {
       baseUrl: $("baseUrl").value.trim(),
       apiKey: $("apiKey").value,
@@ -73,6 +84,7 @@ const s = await loadSettings();
       model: $("model").value.trim(),
       temperature: parseFloat($("temperature").value),
       maxTokens: parseInt($("maxTokens").value, 10),
+      contextLengths,
     };
   }
 
@@ -91,42 +103,43 @@ const s = await loadSettings();
     const data = await res.json();
     if (!res.ok) { box.innerHTML = `<p class="warn">${data.error}</p>`; return; }
     if (!data.models.length) { box.innerHTML = '<p class="note">No models found.</p>'; return; }
+
+    // Rebuild the default-model dropdown from the live list.
+    const sel = $("model");
+    const current = sel.value || initial.model;
+    sel.innerHTML = "";
+    for (const m of data.models) {
+      const opt = document.createElement("option");
+      opt.value = m.key;
+      opt.textContent = m.displayName;
+      if (m.key === current) opt.selected = true;
+      sel.appendChild(opt);
+    }
+
+    // Model list: context length only.
     box.innerHTML = "";
     for (const m of data.models) {
       const row = document.createElement("div");
       row.className = "row";
       row.style.justifyContent = "space-between";
+      row.style.alignItems = "center";
       row.style.borderTop = "1px solid var(--line)";
-      row.style.padding = "10px 0";
+      row.style.padding = "12px 0";
+      const ctx = contextLengths[m.key] ?? "";
       row.innerHTML = `
         <div><div>${m.displayName}</div><div class="mono">${m.key}</div></div>
-        <div class="row">
+        <div class="row" style="align-items:center">
           <span class="pill ${m.loaded ? "on" : ""}">${m.loaded ? "loaded" : "idle"}</span>
-          <button class="btn ghost" data-use="${m.key}">Use</button>
-          <button class="btn" data-load="${m.key}">${m.loaded ? "Reload" : "Load"}</button>
-          ${m.loaded ? `<button class="btn danger" data-unload="${m.key}">Unload</button>` : ""}
+          <label class="mono" style="margin:0">Context</label>
+          <input data-ctx="${m.key}" type="number" step="1024" min="0" value="${ctx}" placeholder="default" style="width:130px" />
         </div>`;
       box.appendChild(row);
     }
-    box.querySelectorAll("[data-use]").forEach((b) =>
-      b.addEventListener("click", () => { $("model").value = b.dataset.use; toast("Set as default model — remember to Save."); }));
-    box.querySelectorAll("[data-load]").forEach((b) =>
-      b.addEventListener("click", () => act("load", b.dataset.load)));
-    box.querySelectorAll("[data-unload]").forEach((b) =>
-      b.addEventListener("click", () => act("unload", b.dataset.unload)));
-  }
-
-  async function act(action, model) {
-    toast(action === "load" ? "Loading model…" : "Unloading…");
-    const res = await fetch("/api/models", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, model }),
-    });
-    const data = await res.json();
-    if (!res.ok) return toast(data.error || "Failed.", true);
-    toast("Done.");
-    refresh();
   }
 
   $("save").addEventListener("click", save);
   $("refresh").addEventListener("click", refresh);
+
+  // Load the model list on first paint so the dropdown + context inputs are ready.
+  refresh();
 </script>

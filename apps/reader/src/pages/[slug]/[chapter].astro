@@ -19,7 +19,14 @@ const base = import.meta.env.BASE_URL;
 const href = (p) => `${base}${p}`.replace(/([^:]\/)\/+/g, "$1");
 ---
 
-<Reader title={`${ch.title} · ${meta.title}`}>
+<Reader title={`${ch.title} · ${meta.title}`} bodyClass="reading">
+  <button slot="header-actions" id="settings-toggle" class="icon-btn" type="button" aria-label="Reading settings">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </svg>
+  </button>
+
   <div class="container wide">
     <div class="crumbs">
       <a href={href("")}>Library</a> / <a href={href(slug)}>{meta.title}</a> / {ch.title}
@@ -33,4 +40,182 @@ const href = (p) => `${base}${p}`.replace(/([^:]\/)\/+/g, "$1");
       {ch.next ? <a href={href(`${slug}/${ch.next.number}`)}>{ch.next.title} →</a> : <a href={href(slug)}>Contents</a>}
     </nav>
   </div>
+
+  <!-- Reading settings panel -->
+  <div id="settings-backdrop" class="settings-backdrop"></div>
+  <aside id="settings-panel" class="settings-panel" aria-label="Reading settings">
+    <div class="settings-head">
+      <h3>Reading settings</h3>
+      <button id="settings-close" class="icon-btn" type="button" aria-label="Close settings">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <div class="settings-group">
+      <label>Font</label>
+      <div class="seg cols-3" id="font-buttons">
+        <button data-font="serif" style="font-family: Georgia, serif">Serif</button>
+        <button data-font="sans" style="font-family: system-ui, sans-serif">Sans</button>
+        <button data-font="mono" style="font-family: 'Courier New', monospace">Mono</button>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <label>Size — <span id="size-label">18</span>px</label>
+      <div class="stepper">
+        <button id="size-minus" class="step-btn" type="button" aria-label="Smaller">−</button>
+        <input id="size-range" type="range" min="14" max="28" value="18" />
+        <button id="size-plus" class="step-btn" type="button" aria-label="Larger">+</button>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <label>Line spacing — <span id="lh-label">1.8</span></label>
+      <div class="stepper">
+        <input id="lh-range" type="range" min="1.2" max="2.5" step="0.1" value="1.8" />
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <label>Column width</label>
+      <div class="seg cols-3" id="width-buttons">
+        <button data-width="narrow">Narrow</button>
+        <button data-width="medium">Medium</button>
+        <button data-width="wide">Wide</button>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <label>Reader theme</label>
+      <div class="theme-dots" id="theme-buttons">
+        <button class="theme-dot" data-theme="white" title="White" style="background:#ffffff"></button>
+        <button class="theme-dot" data-theme="cream" title="Cream" style="background:#faf8f1"></button>
+        <button class="theme-dot" data-theme="sepia" title="Sepia" style="background:#f4ecd8"></button>
+        <button class="theme-dot" data-theme="dark" title="Dark" style="background:#1a1a1a"></button>
+        <button class="theme-dot" data-theme="black" title="Black" style="background:#000000"></button>
+      </div>
+    </div>
+  </aside>
+
+  <script is:inline>
+    // ── Reading settings: persisted to localStorage, applied to CSS vars ──
+    (function () {
+      var STORAGE_KEY = "st-reader-settings";
+      var FONTS = {
+        serif: "ui-serif, Georgia, 'Iowan Old Style', 'Times New Roman', serif",
+        sans: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
+        mono: "ui-monospace, 'JetBrains Mono', 'Courier New', monospace",
+      };
+      var WIDTHS = { narrow: "36rem", medium: "44rem", wide: "56rem" };
+      var defaults = {
+        fontFamily: "serif",
+        fontSize: 18,
+        lineHeight: 1.8,
+        maxWidth: "narrow",
+        readerTheme: "cream",
+      };
+
+      function load() {
+        try {
+          var s = localStorage.getItem(STORAGE_KEY);
+          return s ? Object.assign({}, defaults, JSON.parse(s)) : Object.assign({}, defaults);
+        } catch (e) {
+          return Object.assign({}, defaults);
+        }
+      }
+      function save(s) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+        } catch (e) {}
+      }
+
+      var settings = load();
+      var root = document.documentElement;
+      var panel = document.getElementById("settings-panel");
+      var backdrop = document.getElementById("settings-backdrop");
+
+      function apply() {
+        root.style.setProperty("--reader-font", FONTS[settings.fontFamily] || FONTS.serif);
+        root.style.setProperty("--reader-size", settings.fontSize + "px");
+        root.style.setProperty("--reader-lh", String(settings.lineHeight));
+        root.style.setProperty("--reader-width", WIDTHS[settings.maxWidth] || WIDTHS.narrow);
+        root.setAttribute("data-reader-theme", settings.readerTheme);
+
+        // Chrome follows the reader theme on the reading surface.
+        var isDark = settings.readerTheme === "dark" || settings.readerTheme === "black";
+        root.classList.toggle("dark", isDark);
+
+        // Sync control labels + active states.
+        document.getElementById("size-label").textContent = String(settings.fontSize);
+        document.getElementById("lh-label").textContent = Number(settings.lineHeight).toFixed(1);
+        document.getElementById("size-range").value = String(settings.fontSize);
+        document.getElementById("lh-range").value = String(settings.lineHeight);
+
+        setActive("#font-buttons button", "font", settings.fontFamily);
+        setActive("#width-buttons button", "width", settings.maxWidth);
+        setActive("#theme-buttons button", "theme", settings.readerTheme);
+      }
+
+      function setActive(selector, attr, value) {
+        document.querySelectorAll(selector).forEach(function (b) {
+          b.classList.toggle("active", b.dataset[attr] === value);
+        });
+      }
+      function update(partial) {
+        Object.assign(settings, partial);
+        save(settings);
+        apply();
+      }
+
+      // Open / close panel.
+      var toggle = document.getElementById("settings-toggle");
+      function open() {
+        panel.classList.add("open");
+        backdrop.classList.add("open");
+      }
+      function close() {
+        panel.classList.remove("open");
+        backdrop.classList.remove("open");
+      }
+      toggle.addEventListener("click", function () {
+        panel.classList.contains("open") ? close() : open();
+      });
+      document.getElementById("settings-close").addEventListener("click", close);
+      backdrop.addEventListener("click", close);
+
+      // Controls.
+      document.querySelectorAll("#font-buttons button").forEach(function (b) {
+        b.addEventListener("click", function () {
+          update({ fontFamily: b.dataset.font });
+        });
+      });
+      document.getElementById("size-minus").addEventListener("click", function () {
+        update({ fontSize: Math.max(14, settings.fontSize - 1) });
+      });
+      document.getElementById("size-plus").addEventListener("click", function () {
+        update({ fontSize: Math.min(28, settings.fontSize + 1) });
+      });
+      document.getElementById("size-range").addEventListener("input", function (e) {
+        update({ fontSize: parseInt(e.target.value, 10) });
+      });
+      document.getElementById("lh-range").addEventListener("input", function (e) {
+        update({ lineHeight: parseFloat(e.target.value) });
+      });
+      document.querySelectorAll("#width-buttons button").forEach(function (b) {
+        b.addEventListener("click", function () {
+          update({ maxWidth: b.dataset.width });
+        });
+      });
+      document.querySelectorAll("#theme-buttons button").forEach(function (b) {
+        b.addEventListener("click", function () {
+          update({ readerTheme: b.dataset.theme });
+        });
+      });
+
+      apply();
+    })();
+  </script>
 </Reader>

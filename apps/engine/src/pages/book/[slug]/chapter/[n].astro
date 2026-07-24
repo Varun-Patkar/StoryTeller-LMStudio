@@ -2,6 +2,7 @@
 import Layout from "../../../../layouts/Layout.astro";
 import matter from "gray-matter";
 import { getBook, readBookFile, chapterRel, planSlice, stripComments } from "../../../../lib/books.js";
+import { loadSettings } from "../../../../lib/settings.js";
 
 const { slug, n } = Astro.params;
 const num = Number(n);
@@ -16,6 +17,7 @@ const chapterBody = parsed.content.trim();
 
 const planText = stripComments(await readBookFile(slug, "plan.md"));
 const slice = planSlice(planText, num);
+const settings = await loadSettings();
 ---
 
 <Layout title={`Chapter ${num} · ${book.title}`}>
@@ -25,6 +27,14 @@ const slice = planSlice(planText, num);
       <p class="sub mono">chapter {num}</p>
     </div>
     <a class="btn ghost" href={`/book/${slug}`}>← Book</a>
+  </div>
+
+  <div class="card">
+    <div class="row" style="align-items:center">
+      <label for="model" class="mono" style="margin:0">Model</label>
+      <select id="model" style="width:auto;min-width:240px"></select>
+      <span class="note">Loaded on demand when you generate or rewrite.</span>
+    </div>
   </div>
 
   <div class="card">
@@ -81,10 +91,14 @@ const slice = planSlice(planText, num);
   <div class="toast" id="toast"></div>
 </Layout>
 
-<script define:vars={{ slug, num, rel }}>
+<script is:inline src="/model-picker.js"></script>
+<script define:vars={{ slug, num, rel, defaultModel: settings.model }}>
   const $ = (id) => document.getElementById(id);
   const toast = (m, e = false) => { const t = $("toast"); t.textContent = m; t.className = "toast show" + (e ? " err" : ""); setTimeout(() => (t.className = "toast"), 2600); };
   const editor = $("editor");
+
+  // Populate the model dropdown; both Generate and Rewrite use the selection.
+  window.initModelPicker?.($("model"), defaultModel);
 
   // Track selection within the editor.
   let sel = { start: 0, end: 0 };
@@ -103,7 +117,7 @@ const slice = planSlice(planText, num);
     $("status").textContent = "Generating from your prompts…";
     $("gen").disabled = true;
     try {
-      const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, task: "chapter", n: num, planSlice: $("slice").value }) });
+      const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, task: "chapter", n: num, planSlice: $("slice").value, model: $("model").value }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed.");
       editor.value = data.text.trim();
@@ -126,7 +140,7 @@ const slice = planSlice(planText, num);
     $("rw-status").textContent = "Revising…";
     $("rewrite").disabled = true;
     try {
-      const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, task: "rewrite", fullText: editor.value, selection, comment }) });
+      const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, task: "rewrite", fullText: editor.value, selection, comment, model: $("model").value }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed.");
       $("result-text").value = data.text.trim();
