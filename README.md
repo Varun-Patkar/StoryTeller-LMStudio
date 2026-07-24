@@ -133,3 +133,9 @@ On first run, open the engine's **Settings** page and point it at your LM Studio
 - **No graph, no research.** Memory is plain human-written markdown. Nothing is fetched.
 - **Engine is local-only.** Only the reader is published, so nothing that talks to your
   machine or LM Studio ever ships.
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE). © 2026 Varun Patkar.
