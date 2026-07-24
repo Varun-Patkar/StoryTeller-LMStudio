@@ -3,6 +3,11 @@
 A **local, LM Studio-powered story-generation engine** plus a static **Astro reader** you
 publish to GitHub Pages.
 
+- 📖 **Live reader:** <https://varun-patkar.github.io/StoryTeller-LMStudio/>
+- 💻 **Repository:** <https://github.com/Varun-Patkar/StoryTeller-LMStudio>
+- 🚀 **Deployment:** [Deploy reader to GitHub Pages](https://github.com/Varun-Patkar/StoryTeller-LMStudio/actions/workflows/deploy.yml)
+  workflow — builds `apps/reader` and publishes to Pages on every push to `main`.
+
 It exists because of one observation: stories written on top of GitHub Copilot always
 _read_ as AI. Not because of the story idea — because ~90% of what actually reaches the
 model is machine-authored (Copilot's own system prompt, an auto-injected `AGENTS.md`,
