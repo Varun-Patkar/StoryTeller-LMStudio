@@ -26,6 +26,8 @@ export const REPO_ROOT =
 	findRoot(process.cwd()) ||
 	path.resolve(here, "../../../../");
 export const BOOKS_DIR = path.join(REPO_ROOT, "books");
+// Author-level prompts, shared by every book (system, plan/chapter/rewrite instructions, samples).
+export const PROMPTS_DIR = path.join(REPO_ROOT, "prompts");
 export const SETTINGS_DIR = path.join(REPO_ROOT, ".storyteller");
 export const SETTINGS_FILE = path.join(SETTINGS_DIR, "settings.json");
 

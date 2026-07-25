@@ -10,6 +10,8 @@ const DEFAULTS = {
 	mode: "completions",
 	temperature: 0.9,
 	maxTokens: 4096,
+	// Max tool-calling rounds the agentic loop may take before it must return an answer.
+	agentMaxSteps: 8,
 	// Per-model context length used when a model is loaded just-in-time for generation.
 	// Shape: { [modelKey]: number }.
 	contextLengths: {},

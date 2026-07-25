@@ -1,0 +1,49 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import BookTabs from "../../../components/BookTabs.astro";
+import { getBook, readBookFile } from "../../../lib/books.js";
+
+const { slug } = Astro.params;
+const book = await getBook(slug);
+if (!book) return Astro.redirect("/");
+const canon = await readBookFile(slug, "canon.md");
+---
+
+<Layout title={`Canon · ${book.title}`}>
+  <h1>{book.title}</h1>
+  <p class="sub mono">{book.slug}</p>
+  <BookTabs slug={slug} active="canon" />
+
+  <div class="card">
+    <h2>canon.md</h2>
+    <p class="note">For <strong>fanfiction</strong>: write the full source-canon timeline — the events,
+      arcs, and outcomes the model should treat as true unless your plan diverges. The generator
+      does not dump this in; it reads it on demand while writing. You can draft it with an AI, then
+      edit it into your own words. Leave it empty for original fiction.</p>
+    <p class="warn" style="display:none" id="lint">This file still carries the AI-draft marker
+      <code>&lt;!-- AI-DRAFT: replace before real use --&gt;</code>. Rewrite it in your own words and
+      remove the marker before generating anything real.</p>
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn" id="save">Save</button>
+      <span class="note" id="status"></span>
+    </div>
+    <textarea id="editor" style="min-height:520px" set:text={canon}></textarea>
+  </div>
+  <div class="toast" id="toast"></div>
+</Layout>
+
+<script define:vars={{ slug }}>
+  const $ = (id) => document.getElementById(id);
+  const toast = (m, e = false) => { const t = $("toast"); t.textContent = m; t.className = "toast show" + (e ? " err" : ""); setTimeout(() => (t.className = "toast"), 2600); };
+
+  // Surface the AI-draft warning if the marker is still present.
+  const marker = "<!-- AI-DRAFT: replace before real use -->";
+  const reflectLint = () => { $("lint").style.display = $("editor").value.includes(marker) ? "block" : "none"; };
+  reflectLint();
+  $("editor").addEventListener("input", reflectLint);
+
+  $("save").addEventListener("click", async () => {
+    const res = await fetch("/api/file", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, rel: "canon.md", content: $("editor").value }) });
+    toast(res.ok ? "Saved." : "Save failed.", !res.ok);
+  });
+</script>

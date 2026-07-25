@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import matter from "gray-matter";
-import { BOOKS_DIR, AI_DRAFT_MARKER } from "./paths.js";
+import { BOOKS_DIR, PROMPTS_DIR, AI_DRAFT_MARKER } from "./paths.js";
 
 const MEMORY_CATEGORIES = ["characters", "events", "locations"];
 
@@ -82,16 +82,8 @@ const TEMPLATE = {
 	"plan.md": () =>
 		`<!-- Generated from YOUR plan-prompt in the engine. -->\n\n_No plan yet._\n`,
 	"summary.md": () => `<!-- Running per-chapter summaries. -->\n`,
-	"prompts/system.md": () =>
-		`${AI_DRAFT_MARKER}\n\n<!--\n  SYSTEM PROMPT. This ships as an AI-written placeholder — rewrite it in your own words\n  before generating anything real. Many models sound most human with NO system prompt at\n  all; if so, delete everything here and leave the file empty.\n-->\n\nYou are writing prose for a novel. Continue in the exact voice, rhythm, and vocabulary of the\nwriting samples you are given. Write only the story text.\n`,
-	"prompts/plan-prompt.md": () =>
-		`<!-- Human-written. YOUR instruction for turning config + memory into a plan. -->\n\nUsing the config, characters, events, and locations above, write a chapter-by-chapter plan.\nFor each chapter give a short title, the key beats, who is present, and what changes by the end.\nOutline only — no prose. Number the chapters.\n`,
-	"prompts/chapter-prompt.md": () =>
-		`<!-- Human-written. YOUR instruction for writing a single chapter. -->\n\nWrite this chapter in full, following the plan entry above and staying grounded in the\ncharacters, events, and locations. Match the voice of the writing samples exactly. Keep\ncontinuity with the running summary. Write only the chapter prose.\n`,
-	"prompts/rewrite-prompt.md": () =>
-		`<!-- Human-written. YOUR instruction for revising text from a note. -->\n\nYou are revising existing prose. Apply the note; change only what it asks for and keep\neverything else intact. Keep the same voice. Return only the revised text — no commentary.\n`,
-	"prompts/samples/sample-01.md": () =>
-		`<!-- Human-written reference prose. THIS teaches the model your voice. Replace it. -->\n\n_Paste a passage you wrote yourself here._\n`,
+	"canon.md": () =>
+		`${AI_DRAFT_MARKER}\n\n<!--\n  CANON TIMELINE (fanfiction only). Write, in full, what happens across the ENTIRE source\n  canon this story is based on — the events, arcs, and outcomes the model should treat as\n  true unless your plan diverges from them. You may draft this with an AI first, then edit\n  it into your own words. Leave this file empty for original fiction.\n-->\n\n# Canon timeline\n\n_No canon recorded yet._\n`,
 };
 
 export async function createBook(rawSlug, title) {
@@ -104,7 +96,6 @@ export async function createBook(rawSlug, title) {
 		await fs.mkdir(path.join(dir, "memory", category), { recursive: true });
 	}
 	await fs.mkdir(path.join(dir, "chapters"), { recursive: true });
-	await fs.mkdir(path.join(dir, "prompts", "samples"), { recursive: true });
 	for (const [rel, make] of Object.entries(TEMPLATE)) {
 		const full = path.join(dir, rel);
 		await fs.mkdir(path.dirname(full), { recursive: true });
@@ -137,6 +128,80 @@ export async function writeBookFile(slug, rel, content) {
 export async function deleteBookFile(slug, rel) {
 	await fs.rm(resolveInBook(safeSlug(slug), rel), { force: true });
 	return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Global prompts (author-level, shared by every book) — repo-root `prompts/`.
+// ---------------------------------------------------------------------------
+
+const GLOBAL_PROMPT_TEMPLATE = {
+	"system.md": () =>
+		`${AI_DRAFT_MARKER}\n\n<!--\n  GLOBAL SYSTEM PROMPT — shared by every book. This ships as an AI-written placeholder;\n  rewrite it in your own words before generating anything real. Many local models sound\n  most human with NO system prompt at all — if so, delete everything here and leave this\n  file empty.\n-->\n\nYou are writing prose for a novel. Continue in the exact voice, rhythm, and vocabulary of the\nwriting samples. Write only the story text.\n`,
+	"plan-prompt.md": () =>
+		`<!-- Human-written. YOUR instruction for turning a book's config, canon, and memory into a plan. -->\n\nRead the book's \`config.md\`, its \`canon.md\` (if present), and everything under \`memory/\` using\nthe tools, then write a chapter-by-chapter plan. For each chapter give a short title, the key\nbeats, who is present, and what changes by the end. Outline only — no prose. Number the chapters.\n`,
+	"chapter-prompt.md": () =>
+		`<!-- Human-written. YOUR instruction for writing a single chapter. -->\n\nWrite this chapter in full, following the plan slice provided. Read the writing samples with the\ntools to match the voice exactly, and check \`memory/\` and \`canon.md\` for any names, facts, or\ncontinuity you need. Keep continuity with \`summary.md\`. Write only the chapter prose.\n`,
+	"rewrite-prompt.md": () =>
+		`<!-- Human-written. YOUR instruction for revising text from a note. -->\n\nYou are revising existing prose. Apply the note; change only what it asks for and keep everything\nelse intact. Keep the same voice as the writing samples. If the note touches facts, check\n\`memory/\` and \`canon.md\` with the tools. Return only the revised text — no commentary.\n`,
+	"samples/sample-01.md": () =>
+		`<!-- Human-written reference prose. THIS teaches the model your voice more than any instruction. Replace it. -->\n\n_Paste a passage you wrote yourself here._\n`,
+};
+
+function resolveInPrompts(rel) {
+	const full = path.resolve(PROMPTS_DIR, rel);
+	if (full !== PROMPTS_DIR && !full.startsWith(PROMPTS_DIR + path.sep)) {
+		throw new Error("Path escapes the prompts folder.");
+	}
+	return full;
+}
+export async function readGlobalPrompt(rel) {
+	return readMaybe(resolveInPrompts(rel));
+}
+export async function writeGlobalPrompt(rel, content) {
+	const full = resolveInPrompts(rel);
+	await fs.mkdir(path.dirname(full), { recursive: true });
+	await fs.writeFile(full, content, "utf8");
+	return { ok: true };
+}
+export async function deleteGlobalPrompt(rel) {
+	await fs.rm(resolveInPrompts(rel), { force: true });
+	return { ok: true };
+}
+export async function listGlobalSamples() {
+	const dir = path.join(PROMPTS_DIR, "samples");
+	if (!(await exists(dir))) return [];
+	return (await fs.readdir(dir)).filter((f) => f.endsWith(".md")).sort();
+}
+/** Create any missing global prompt files from the template (idempotent). */
+export async function ensureGlobalPrompts() {
+	for (const [rel, make] of Object.entries(GLOBAL_PROMPT_TEMPLATE)) {
+		const full = resolveInPrompts(rel);
+		if (!(await exists(full))) {
+			await fs.mkdir(path.dirname(full), { recursive: true });
+			await fs.writeFile(full, make(), "utf8");
+		}
+	}
+}
+/** Flag global prompt files still carrying the AI-draft marker. */
+export async function globalPromptLint() {
+	const flagged = [];
+	if (!(await exists(PROMPTS_DIR))) return flagged;
+	async function walk(d) {
+		for (const e of await fs.readdir(d, { withFileTypes: true })) {
+			const p = path.join(d, e.name);
+			if (e.isDirectory()) await walk(p);
+			else if (e.name.endsWith(".md")) {
+				const raw = await readMaybe(p);
+				if (raw.includes(AI_DRAFT_MARKER))
+					flagged.push(
+						"prompts/" +
+							path.relative(PROMPTS_DIR, p).replace(/\\/g, "/"),
+					);
+			}
+		}
+	}
+	await walk(PROMPTS_DIR);
+	return flagged;
 }
 
 // ---------------------------------------------------------------------------
@@ -195,86 +260,60 @@ export async function appendSummary(slug, n, text) {
 }
 
 // ---------------------------------------------------------------------------
-// Prompt lint — flags prompt files still carrying the AI-draft marker.
+// Per-book lint — flags the book's own AI-drafted files (currently canon.md).
+// Global prompt files are linted separately via globalPromptLint().
 // ---------------------------------------------------------------------------
 
 export async function promptLint(slug) {
 	slug = safeSlug(slug);
 	const flagged = [];
-	const dir = path.join(bookDir(slug), "prompts");
-	if (!(await exists(dir))) return flagged;
-	async function walk(d) {
-		for (const e of await fs.readdir(d, { withFileTypes: true })) {
-			const p = path.join(d, e.name);
-			if (e.isDirectory()) await walk(p);
-			else if (e.name.endsWith(".md")) {
-				const raw = await readMaybe(p);
-				if (raw.includes(AI_DRAFT_MARKER))
-					flagged.push(path.relative(bookDir(slug), p).replace(/\\/g, "/"));
-			}
-		}
-	}
-	await walk(dir);
+	const canonRaw = await readMaybe(path.join(bookDir(slug), "canon.md"));
+	if (canonRaw.includes(AI_DRAFT_MARKER)) flagged.push("canon.md");
 	return flagged;
 }
 
 // ---------------------------------------------------------------------------
 // Context assembly for generation.
-// Everything here is human-authored; the only text the engine adds is the neutral
-// section labels below (structural glue, no instructions).
+// The agentic loop hands the model a lean prompt (the human instruction + a manifest of
+// what exists) and lets it pull specifics with tools. Everything the model can read is
+// human-authored; the only text the engine adds is the neutral structural glue below.
 // ---------------------------------------------------------------------------
 
-async function gatherMemory(slug) {
-	slug = safeSlug(slug);
-	const parts = [];
-	const mem = await listMemory(slug);
-	for (const category of MEMORY_CATEGORIES) {
-		for (const file of mem[category]) {
-			const body = stripComments(
-				await readBookFile(slug, `memory/${category}/${file}`),
-			);
-			if (body) parts.push(body);
-		}
-	}
-	return parts.join("\n\n");
+export async function getSystemPrompt() {
+	return stripComments(await readGlobalPrompt("system.md"));
 }
-async function gatherSamples(slug) {
-	slug = safeSlug(slug);
-	const dir = path.join(bookDir(slug), "prompts", "samples");
-	if (!(await exists(dir))) return "";
-	const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".md")).sort();
-	const parts = [];
-	for (const f of files) {
-		const body = stripComments(
-			await readBookFile(slug, `prompts/samples/${f}`),
-		);
-		if (body) parts.push(body);
-	}
-	return parts.join("\n\n");
-}
-export async function getSystemPrompt(slug) {
-	return stripComments(await readBookFile(safeSlug(slug), "prompts/system.md"));
+
+/**
+ * Raw read router used by the agentic tools: a "prompts/…" path resolves to the global
+ * prompts folder, anything else to the given book. Returns raw text (comments intact).
+ */
+export async function readResourceRaw(slug, rel) {
+	if (rel === "prompts" || rel.startsWith("prompts/"))
+		return readGlobalPrompt(rel.replace(/^prompts\/?/, ""));
+	return readBookFile(slug, rel);
 }
 
 function section(label, body) {
 	return body && body.trim() ? `## ${label}\n\n${body.trim()}` : "";
 }
 
-/** Build the user prompt for generating the plan (all human-authored). */
-export async function buildPlanPrompt(slug) {
-	slug = safeSlug(slug);
-	const config = stripComments(await readBookFile(slug, "config.md"));
-	const memory = await gatherMemory(slug);
-	const samples = await gatherSamples(slug);
-	const instruction = stripComments(
-		await readBookFile(slug, "prompts/plan-prompt.md"),
-	);
+/**
+ * Neutral resource block appended to every agentic prompt: the manifest of what exists
+ * plus minimal, structural guidance on how to pull it in. No creative instruction — that
+ * always comes from the human prompt files.
+ */
+function resourceBlock(manifest) {
 	return [
-		section("Story config", config),
-		section("Characters, events, locations", memory),
-		section("Writing samples", samples),
-		section("Task", instruction),
-	]
+		"## Available resources",
+		manifest,
+		"Read the resources you need with the tools (list_resources, grep_book, read_book_file) before writing. Read the writing samples to match the voice, and check memory and canon for facts — do not contradict them or invent facts they cover. Your final reply must contain only the requested text, with no tool commentary.",
+	].join("\n\n");
+}
+
+/** Lean prompt for generating the plan: human plan-prompt + resource manifest. */
+export async function buildPlanAgentPrompt(slug, manifest) {
+	const instruction = stripComments(await readGlobalPrompt("plan-prompt.md"));
+	return [section("Task", instruction), resourceBlock(manifest)]
 		.filter(Boolean)
 		.join("\n\n");
 }
@@ -300,56 +339,48 @@ export function planSlice(planText, n) {
 		.trim();
 }
 
-/** Build the user prompt for writing chapter n (all human-authored). */
-export async function buildChapterPrompt(slug, n, planSliceOverride) {
+/** Lean prompt for writing chapter n: human chapter-prompt + plan slice + manifest. */
+export async function buildChapterAgentPrompt(
+	slug,
+	n,
+	planSliceOverride,
+	manifest,
+) {
 	slug = safeSlug(slug);
-	const config = stripComments(await readBookFile(slug, "config.md"));
-	const memory = await gatherMemory(slug);
-	const samples = await gatherSamples(slug);
-	const summary = stripComments(await readBookFile(slug, "summary.md"));
 	const planText = stripComments(await readBookFile(slug, "plan.md"));
 	const slice =
 		planSliceOverride != null && planSliceOverride !== ""
 			? planSliceOverride
 			: planSlice(planText, n);
-	const instruction = stripComments(
-		await readBookFile(slug, "prompts/chapter-prompt.md"),
-	);
+	const instruction = stripComments(await readGlobalPrompt("chapter-prompt.md"));
 	return [
-		section("Story config", config),
-		section("Characters, events, locations", memory),
-		section("Writing samples", samples),
-		section("Summary so far", summary),
-		section(`Plan for chapter ${n}`, slice),
 		section("Task", instruction),
+		section(`Plan for chapter ${n}`, slice),
+		resourceBlock(manifest),
 	]
 		.filter(Boolean)
 		.join("\n\n");
 }
 
-/** Build the user prompt for a rewrite driven by a human comment. */
-export async function buildRewritePrompt(
+/** Lean prompt for a comment-driven rewrite: human rewrite-prompt + target text + manifest. */
+export async function buildRewriteAgentPrompt(
 	slug,
 	{ fullText, selection, comment },
+	manifest,
 ) {
 	slug = safeSlug(slug);
-	const memory = await gatherMemory(slug);
-	const samples = await gatherSamples(slug);
-	const instruction = stripComments(
-		await readBookFile(slug, "prompts/rewrite-prompt.md"),
-	);
+	const instruction = stripComments(await readGlobalPrompt("rewrite-prompt.md"));
 	const target = selection && selection.trim() ? selection : fullText;
 	const context =
 		selection && selection.trim()
 			? section("Surrounding chapter (for context, do not rewrite)", fullText)
 			: "";
 	return [
-		section("Characters, events, locations", memory),
-		section("Writing samples", samples),
+		section("Task", instruction),
 		context,
 		section("Text to revise", target),
 		section("Note", comment),
-		section("Task", instruction),
+		resourceBlock(manifest),
 	]
 		.filter(Boolean)
 		.join("\n\n");

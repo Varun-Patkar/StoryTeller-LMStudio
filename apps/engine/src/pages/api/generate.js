@@ -1,11 +1,16 @@
 import { loadSettings } from "../../lib/settings.js";
-import { generate, ensureLoaded } from "../../lib/lmstudio.js";
+import { generateAgentic, ensureLoaded } from "../../lib/lmstudio.js";
 import {
 	getSystemPrompt,
-	buildPlanPrompt,
-	buildChapterPrompt,
-	buildRewritePrompt,
+	buildPlanAgentPrompt,
+	buildChapterAgentPrompt,
+	buildRewriteAgentPrompt,
 } from "../../lib/books.js";
+import {
+	getToolDefinitions,
+	buildManifest,
+	executeTool,
+} from "../../lib/tools.js";
 
 export const prerender = false;
 
@@ -17,31 +22,52 @@ export async function POST({ request }) {
 			return json({ error: "slug and task are required" }, 400);
 
 		const settings = await loadSettings();
-		const system = await getSystemPrompt(slug);
+		const system = await getSystemPrompt();
+		const manifest = await buildManifest(slug);
 
-		let prompt;
+		// Build the lean user prompt (human instruction + resource manifest) per task.
+		let userPrompt;
 		if (task === "plan") {
-			prompt = await buildPlanPrompt(slug);
+			userPrompt = await buildPlanAgentPrompt(slug, manifest);
 		} else if (task === "chapter") {
-			prompt = await buildChapterPrompt(slug, body.n, body.planSlice);
+			userPrompt = await buildChapterAgentPrompt(
+				slug,
+				body.n,
+				body.planSlice,
+				manifest,
+			);
 		} else if (task === "rewrite") {
-			prompt = await buildRewritePrompt(slug, {
-				fullText: body.fullText || "",
-				selection: body.selection || "",
-				comment: body.comment || "",
-			});
+			userPrompt = await buildRewriteAgentPrompt(
+				slug,
+				{
+					fullText: body.fullText || "",
+					selection: body.selection || "",
+					comment: body.comment || "",
+				},
+				manifest,
+			);
 		} else {
 			return json({ error: "Unknown task" }, 400);
 		}
 
 		// The model chosen for this generation (falls back to the saved default).
 		const model = body.model || settings.model;
-		// Load it just-in-time with its configured context length, if not already loaded.
 		const contextLength = settings.contextLengths?.[model];
 		await ensureLoaded(settings, model, contextLength);
 
-		const text = await generate(settings, { prompt, system, model });
-		return json({ text, prompt });
+		const messages = [];
+		if (system && system.trim())
+			messages.push({ role: "system", content: system });
+		messages.push({ role: "user", content: userPrompt });
+
+		const { text, steps } = await generateAgentic(settings, {
+			messages,
+			tools: getToolDefinitions(),
+			runTool: (name, args) => executeTool(slug, name, args),
+			model,
+			maxSteps: Number(settings.agentMaxSteps) || 8,
+		});
+		return json({ text, steps });
 	} catch (err) {
 		return json({ error: err.message }, 502);
 	}

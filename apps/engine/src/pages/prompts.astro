@@ -1,44 +1,40 @@
 ---
-import Layout from "../../../layouts/Layout.astro";
-import BookTabs from "../../../components/BookTabs.astro";
-import fs from "node:fs/promises";
-import path from "node:path";
-import { getBook, readBookFile } from "../../../lib/books.js";
-import { BOOKS_DIR } from "../../../lib/paths.js";
+import Layout from "../layouts/Layout.astro";
+import {
+  ensureGlobalPrompts,
+  readGlobalPrompt,
+  listGlobalSamples,
+  globalPromptLint,
+} from "../lib/books.js";
 
-const { slug } = Astro.params;
-const book = await getBook(slug);
-if (!book) return Astro.redirect("/");
+// Make sure the global prompt files exist (fresh clone / first run).
+await ensureGlobalPrompts();
 
 const promptFiles = [
-  { rel: "prompts/system.md", label: "System prompt", note: "AI placeholder — replace it. Leave empty to send no system framing." },
-  { rel: "prompts/plan-prompt.md", label: "Plan prompt", note: "Your instruction for generating the plan." },
-  { rel: "prompts/chapter-prompt.md", label: "Chapter prompt", note: "Your instruction for writing a chapter." },
-  { rel: "prompts/rewrite-prompt.md", label: "Rewrite prompt", note: "Your instruction for revising text from a note." },
+  { rel: "system.md", label: "System prompt", note: "AI placeholder — replace it, or leave empty to send no system framing." },
+  { rel: "plan-prompt.md", label: "Plan prompt", note: "Your instruction for generating a book's plan." },
+  { rel: "chapter-prompt.md", label: "Chapter prompt", note: "Your instruction for writing a chapter." },
+  { rel: "rewrite-prompt.md", label: "Rewrite prompt", note: "Your instruction for revising text from a note." },
 ];
-for (const p of promptFiles) p.content = await readBookFile(slug, p.rel);
+for (const p of promptFiles) p.content = await readGlobalPrompt(p.rel);
 
-let sampleFiles = [];
-try {
-  const dir = path.join(BOOKS_DIR, book.slug, "prompts", "samples");
-  sampleFiles = (await fs.readdir(dir)).filter((f) => f.endsWith(".md")).sort();
-} catch {}
+const sampleFiles = await listGlobalSamples();
+const lint = await globalPromptLint();
 ---
 
-<Layout title={`Prompts · ${book.title}`}>
-  <h1>{book.title}</h1>
-  <p class="sub mono">{book.slug}</p>
-  <BookTabs slug={slug} active="prompts" />
+<Layout title="Prompts · StoryTeller Engine">
+  <h1>Prompts</h1>
+  <p class="sub">Author-level prompts, shared by every book. Stored in the repo-root <span class="mono">prompts/</span> folder.</p>
 
-  {book.lint.length > 0 && (
-    <div class="warn"><strong>Still AI drafts:</strong> {book.lint.map((f) => <code>{f} </code>)} — rewrite in your own words.</div>
+  {lint.length > 0 && (
+    <div class="warn"><strong>Still AI drafts:</strong> {lint.map((f) => <code>{f} </code>)} — rewrite in your own words and remove the marker.</div>
   )}
 
   {promptFiles.map((p) => (
     <div class="card">
-      <h2>{p.label} <span class="mono note">— {p.rel}</span></h2>
+      <h2>{p.label} <span class="mono note">— prompts/{p.rel}</span></h2>
       <p class="note">{p.note}</p>
-      <textarea data-file={p.rel} set:text={p.content}></textarea>
+      <textarea data-file={p.rel} style="min-height:180px" set:text={p.content}></textarea>
       <div class="row" style="margin-top:10px"><button class="btn" data-save={p.rel}>Save</button></div>
     </div>
   ))}
@@ -50,8 +46,8 @@ try {
       {sampleFiles.length === 0 && <p class="note">No samples yet.</p>}
       {sampleFiles.map((f) => (
         <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding:8px 0">
-          <a href="#" data-open={`prompts/samples/${f}`}>{f}</a>
-          <button class="btn danger" data-del={`prompts/samples/${f}`}>✕</button>
+          <a href="#" data-open={`samples/${f}`}>{f}</a>
+          <button class="btn danger" data-del={`samples/${f}`}>✕</button>
         </div>
       ))}
     </div>
@@ -67,10 +63,10 @@ try {
   <div class="toast" id="toast"></div>
 </Layout>
 
-<script define:vars={{ slug }}>
+<script>
   const $ = (id) => document.getElementById(id);
   const toast = (m, e = false) => { const t = $("toast"); t.textContent = m; t.className = "toast show" + (e ? " err" : ""); setTimeout(() => (t.className = "toast"), 2200); };
-  const put = (rel, content) => fetch("/api/file", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, rel, content }) });
+  const put = (rel, content) => fetch("/api/prompt", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rel, content }) });
 
   document.querySelectorAll("[data-save]").forEach((b) => b.addEventListener("click", async () => {
     const rel = b.dataset.save;
@@ -82,17 +78,17 @@ try {
   // samples
   let sampleRel = null;
   async function openSample(rel) {
-    const res = await fetch(`/api/file?slug=${encodeURIComponent(slug)}&rel=${encodeURIComponent(rel)}`);
+    const res = await fetch(`/api/prompt?rel=${encodeURIComponent(rel)}`);
     const data = await res.json();
     sampleRel = rel;
     $("sample-editor").style.display = "block";
-    $("sample-path").textContent = rel;
+    $("sample-path").textContent = "prompts/" + rel;
     $("sample-text").value = data.content;
   }
   document.querySelectorAll("[data-open]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); openSample(a.dataset.open); }));
   document.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => {
-    if (!confirm(`Delete ${b.dataset.del}?`)) return;
-    const res = await fetch("/api/file", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, rel: b.dataset.del }) });
+    if (!confirm(`Delete prompts/${b.dataset.del}?`)) return;
+    const res = await fetch("/api/prompt", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rel: b.dataset.del }) });
     if (res.ok) location.reload(); else toast("Delete failed.", true);
   }));
   $("add-sample").addEventListener("click", async () => {
@@ -100,7 +96,7 @@ try {
     if (!name) return;
     const clean = name.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
     if (!clean) return toast("Invalid name.", true);
-    const res = await put(`prompts/samples/${clean}.md`, "");
+    const res = await put(`samples/${clean}.md`, "");
     if (res.ok) location.reload(); else toast("Create failed.", true);
   });
   $("sample-save").addEventListener("click", async () => {

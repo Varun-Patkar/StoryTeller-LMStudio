@@ -160,3 +160,87 @@ export async function generate(settings, { prompt, system = "", model }) {
 	const data = await res.json();
 	return data.choices?.[0]?.text ?? "";
 }
+
+/**
+ * Agentic generation via LM Studio's OpenAI-compatible chat API with tool calling.
+ *
+ * The model is handed a lean prompt plus read-only tools and drives its own context
+ * gathering: it may call tools (which we execute against the human-authored book files),
+ * read the results, and loop until it returns final prose. This uses far fewer tokens
+ * than dumping every memory file up front.
+ *
+ * @param settings   engine settings (baseUrl, apiKey, model, temperature, maxTokens…)
+ * @param opts.messages    initial chat messages ([system?, user]).
+ * @param opts.tools       tool schema array (OpenAI function-calling format).
+ * @param opts.runTool     async (name, args) => string; executes one tool call.
+ * @param opts.model       model override for this request.
+ * @param opts.maxSteps    max tool-calling rounds before forcing a final answer.
+ * @returns { text, steps } — final prose and how many tool rounds ran.
+ */
+export async function generateAgentic(
+	settings,
+	{ messages, tools, runTool, model, maxSteps = 8 },
+) {
+	const base = normaliseHttp(settings.baseUrl);
+	const headers = { "Content-Type": "application/json" };
+	if (settings.apiKey) headers["Authorization"] = `Bearer ${settings.apiKey}`;
+
+	const temperature = Number(settings.temperature ?? 0.9);
+	const max_tokens = Number(settings.maxTokens ?? 4096);
+	const modelName = model || settings.model || undefined;
+	const convo = [...messages];
+
+	for (let step = 0; step <= maxSteps; step++) {
+		// On the final allowed step, stop offering tools so the model must answer.
+		const offerTools = step < maxSteps;
+		const res = await fetch(`${base}/v1/chat/completions`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				model: modelName,
+				messages: convo,
+				temperature,
+				max_tokens,
+				stream: false,
+				...(offerTools && tools?.length
+					? { tools, tool_choice: "auto" }
+					: {}),
+			}),
+		});
+		if (!res.ok)
+			throw new Error(
+				`LM Studio chat error ${res.status}: ${await res.text()}`,
+			);
+		const data = await res.json();
+		const msg = data.choices?.[0]?.message;
+		if (!msg) throw new Error("LM Studio returned no message.");
+		convo.push(msg);
+
+		const calls = msg.tool_calls || [];
+		if (!calls.length) {
+			return { text: msg.content ?? "", steps: step };
+		}
+
+		// Execute every requested tool and feed the results back in.
+		for (const call of calls) {
+			let args = {};
+			try {
+				args = call.function?.arguments
+					? JSON.parse(call.function.arguments)
+					: {};
+			} catch {
+				args = {};
+			}
+			const result = await runTool(call.function?.name, args);
+			convo.push({
+				role: "tool",
+				tool_call_id: call.id,
+				content: String(result ?? ""),
+			});
+		}
+	}
+	// Ran out of steps without a plain answer; return the last content if any.
+	const last = [...convo].reverse().find((m) => m.role === "assistant");
+	return { text: last?.content ?? "", steps: maxSteps };
+}
+
