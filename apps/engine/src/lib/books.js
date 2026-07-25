@@ -143,6 +143,8 @@ const GLOBAL_PROMPT_TEMPLATE = {
 		`<!-- Human-written. YOUR instruction for writing a single chapter. -->\n\nWrite this chapter in full, following the plan slice provided. Read the writing samples with the\ntools to match the voice exactly, and check \`memory/\` and \`canon.md\` for any names, facts, or\ncontinuity you need. Keep continuity with \`summary.md\`. Write only the chapter prose.\n`,
 	"rewrite-prompt.md": () =>
 		`<!-- Human-written. YOUR instruction for revising text from a note. -->\n\nYou are revising existing prose. Apply the note; change only what it asks for and keep everything\nelse intact. Keep the same voice as the writing samples. If the note touches facts, check\n\`memory/\` and \`canon.md\` with the tools. Return only the revised text — no commentary.\n`,
+	"plan-rewrite-prompt.md": () =>
+		`<!-- Human-written. YOUR instruction for revising the plan from a note. -->\n\nYou are revising an existing chapter-by-chapter plan. Apply the note; change only what it asks for\nand keep the rest of the plan intact. Keep it an outline — no prose. If the note touches facts,\ncheck \`config.md\`, \`memory/\`, and \`canon.md\` with the tools. Keep the chapter numbering consistent.\nReturn only the revised plan text, with no commentary.\n`,
 	"samples/sample-01.md": () =>
 		`<!-- Human-written reference prose. THIS teaches the model your voice more than any instruction. Replace it. -->\n\n_Paste a passage you wrote yourself here._\n`,
 };
@@ -379,6 +381,31 @@ export async function buildRewriteAgentPrompt(
 		section("Task", instruction),
 		context,
 		section("Text to revise", target),
+		section("Note", comment),
+		resourceBlock(manifest),
+	]
+		.filter(Boolean)
+		.join("\n\n");
+}
+
+/** Lean prompt for a comment-driven plan rewrite: human plan-rewrite-prompt + target + manifest. */
+export async function buildPlanRewriteAgentPrompt(
+	slug,
+	{ fullText, selection, comment },
+	manifest,
+) {
+	const instruction = stripComments(
+		await readGlobalPrompt("plan-rewrite-prompt.md"),
+	);
+	const target = selection && selection.trim() ? selection : fullText;
+	const context =
+		selection && selection.trim()
+			? section("Surrounding plan (for context, do not rewrite)", fullText)
+			: "";
+	return [
+		section("Task", instruction),
+		context,
+		section("Plan to revise", target),
 		section("Note", comment),
 		resourceBlock(manifest),
 	]

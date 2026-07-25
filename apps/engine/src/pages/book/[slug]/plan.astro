@@ -29,6 +29,29 @@ const settings = await loadSettings();
     </div>
     <textarea id="editor" style="min-height:480px" set:text={plan}></textarea>
   </div>
+
+  <div class="card">
+    <h2>Rewrite by comment</h2>
+    <p class="note">Select part of the plan above (or select nothing to rewrite the whole plan),
+      leave a note describing the change, and the model revises it — guided by <em>your</em>
+      plan-rewrite-prompt. Nothing is applied until you accept it.</p>
+    <div id="sel-info" class="note mono">Nothing selected — the whole plan will be rewritten.</div>
+    <label for="comment">Your note</label>
+    <textarea id="comment" style="min-height:80px" placeholder="e.g. merge chapters 3 and 4, push the betrayal to the midpoint"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="rewrite">Rewrite plan</button>
+      <span class="note" id="rw-status"></span>
+    </div>
+
+    <div id="result" style="display:none;margin-top:14px">
+      <label>Proposed revision</label>
+      <textarea id="result-text" style="min-height:220px"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="apply">Apply</button>
+        <button class="btn ghost" id="discard">Discard</button>
+      </div>
+    </div>
+  </div>
   <div class="toast" id="toast"></div>
 </Layout>
 
@@ -39,6 +62,21 @@ const settings = await loadSettings();
 
   // Populate the model dropdown (defaults to the saved model).
   window.initModelPicker?.($("model"), defaultModel);
+
+  const editor = $("editor");
+
+  // Track selection within the plan editor (for partial rewrites).
+  let sel = { start: 0, end: 0 };
+  function updateSel() {
+    sel = { start: editor.selectionStart, end: editor.selectionEnd };
+    const has = sel.end > sel.start;
+    $("sel-info").textContent = has
+      ? `Selected ${sel.end - sel.start} characters — only that span will be rewritten.`
+      : "Nothing selected — the whole plan will be rewritten.";
+  }
+  editor.addEventListener("select", updateSel);
+  editor.addEventListener("keyup", updateSel);
+  editor.addEventListener("mouseup", updateSel);
 
   $("gen").addEventListener("click", async () => {
     $("status").textContent = "Generating from your prompts…";
@@ -61,4 +99,35 @@ const settings = await loadSettings();
     const res = await fetch("/api/file", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, rel: "plan.md", content: $("editor").value }) });
     toast(res.ok ? "Saved." : "Save failed.", !res.ok);
   });
+
+  $("rewrite").addEventListener("click", async () => {
+    const comment = $("comment").value.trim();
+    if (!comment) return toast("Leave a note first.", true);
+    const selection = sel.end > sel.start ? editor.value.slice(sel.start, sel.end) : "";
+    $("rw-status").textContent = "Revising…";
+    $("rewrite").disabled = true;
+    try {
+      const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, task: "plan-rewrite", fullText: editor.value, selection, comment, model: $("model").value }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed.");
+      $("result-text").value = data.text.trim();
+      $("result").style.display = "block";
+      $("rw-status").textContent = "";
+    } catch (err) { $("rw-status").textContent = ""; toast(err.message, true); }
+    finally { $("rewrite").disabled = false; }
+  });
+
+  $("apply").addEventListener("click", () => {
+    const revised = $("result-text").value;
+    if (sel.end > sel.start) {
+      editor.value = editor.value.slice(0, sel.start) + revised + editor.value.slice(sel.end);
+    } else {
+      editor.value = revised;
+    }
+    $("result").style.display = "none";
+    $("comment").value = "";
+    updateSel();
+    toast("Applied. Remember to Save.");
+  });
+  $("discard").addEventListener("click", () => { $("result").style.display = "none"; });
 </script>

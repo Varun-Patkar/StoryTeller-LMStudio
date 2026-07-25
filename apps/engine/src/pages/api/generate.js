@@ -5,6 +5,7 @@ import {
 	buildPlanAgentPrompt,
 	buildChapterAgentPrompt,
 	buildRewriteAgentPrompt,
+	buildPlanRewriteAgentPrompt,
 } from "../../lib/books.js";
 import {
 	getToolDefinitions,
@@ -38,6 +39,16 @@ export async function POST({ request }) {
 			);
 		} else if (task === "rewrite") {
 			userPrompt = await buildRewriteAgentPrompt(
+				slug,
+				{
+					fullText: body.fullText || "",
+					selection: body.selection || "",
+					comment: body.comment || "",
+				},
+				manifest,
+			);
+		} else if (task === "plan-rewrite") {
+			userPrompt = await buildPlanRewriteAgentPrompt(
 				slug,
 				{
 					fullText: body.fullText || "",
