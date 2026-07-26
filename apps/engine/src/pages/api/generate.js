@@ -34,7 +34,7 @@ export async function POST({ request }) {
 			userPrompt = await buildChapterAgentPrompt(
 				slug,
 				body.n,
-				body.planSlice,
+				body.plan,
 				manifest,
 			);
 		} else if (task === "rewrite") {

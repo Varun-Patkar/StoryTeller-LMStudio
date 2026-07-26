@@ -138,7 +138,7 @@ const GLOBAL_PROMPT_TEMPLATE = {
 	"system.md": () =>
 		`${AI_DRAFT_MARKER}\n\n<!--\n  GLOBAL SYSTEM PROMPT — shared by every book. This ships as an AI-written placeholder;\n  rewrite it in your own words before generating anything real. Many local models sound\n  most human with NO system prompt at all — if so, delete everything here and leave this\n  file empty.\n-->\n\nYou are writing prose for a novel. Continue in the exact voice, rhythm, and vocabulary of the\nwriting samples. Write only the story text.\n`,
 	"plan-prompt.md": () =>
-		`<!-- Human-written. YOUR instruction for turning a book's config, canon, and memory into a plan. -->\n\nRead the book's \`config.md\`, its \`canon.md\` (if present), and everything under \`memory/\` using\nthe tools, then write a chapter-by-chapter plan. For each chapter give a short title, the key\nbeats, who is present, and what changes by the end. Outline only — no prose. Number the chapters.\n`,
+		`<!-- Human-written. YOUR instruction for turning a book's config, canon, and memory into a living plan. -->\n\nRead the book's \`config.md\`, its \`canon.md\` (if present), and everything under \`memory/\` with\nthe tools, then write a LIVING plan — not the whole story. Include: a short PREMISE; a few loose\nlines on the OVERARCHING direction (only as far as the idea supports — do not invent a whole plot);\nand NEAR-TERM detail as a beat outline for only the part that is actually known (e.g. the first\narc, up to the next chapter or two). Outline only, no prose. It is fine to leave the later story\nvague; the plan grows as you write. Do not pad it into a full chapter-by-chapter breakdown.\n`,
 	"chapter-prompt.md": () =>
 		`<!-- Human-written. YOUR instruction for writing a single chapter. -->\n\nWrite this chapter in full, following the plan slice provided. Read the writing samples with the\ntools to match the voice exactly, and check \`memory/\` and \`canon.md\` for any names, facts, or\ncontinuity you need. Keep continuity with \`summary.md\`. Write only the chapter prose.\n`,
 	"rewrite-prompt.md": () =>
@@ -320,44 +320,21 @@ export async function buildPlanAgentPrompt(slug, manifest) {
 		.join("\n\n");
 }
 
-/** Split a plan into per-chapter blocks and return the slice for chapter n. */
-export function planSlice(planText, n) {
-	const lines = String(planText).split(/\r?\n/);
-	const starts = [];
-	const re = /^\s{0,3}(?:#{1,6}\s*)?(?:chapter\s*)?0*(\d+)\b[:.\-\s)]/i;
-	lines.forEach((line, i) => {
-		const m = line.match(re);
-		if (m) starts.push({ num: Number(m[1]), i });
-	});
-	const start = starts.find((s) => s.num === Number(n));
-	if (!start) return String(planText).trim(); // fall back to the whole plan
-	const nextIdx = starts
-		.filter((s) => s.i > start.i)
-		.map((s) => s.i)
-		.sort((a, b) => a - b)[0];
-	return lines
-		.slice(start.i, nextIdx ?? lines.length)
-		.join("\n")
-		.trim();
-}
-
-/** Lean prompt for writing chapter n: human chapter-prompt + plan slice + manifest. */
-export async function buildChapterAgentPrompt(
-	slug,
-	n,
-	planSliceOverride,
-	manifest,
-) {
+/**
+ * Lean prompt for writing chapter n: human chapter-prompt + the whole (living) plan + manifest.
+ * The plan is intentionally NOT sliced per chapter — it is a short premise + overarching
+ * direction + near-term detail, and the model uses the running summary for "where we are".
+ * `planOverride` lets the chapter page send an edited plan for this one generation.
+ */
+export async function buildChapterAgentPrompt(slug, n, planOverride, manifest) {
 	slug = safeSlug(slug);
 	const planText = stripComments(await readBookFile(slug, "plan.md"));
-	const slice =
-		planSliceOverride != null && planSliceOverride !== ""
-			? planSliceOverride
-			: planSlice(planText, n);
+	const plan =
+		planOverride != null && planOverride !== "" ? planOverride : planText;
 	const instruction = stripComments(await readGlobalPrompt("chapter-prompt.md"));
 	return [
 		section("Task", instruction),
-		section(`Plan for chapter ${n}`, slice),
+		section(`Plan (you are writing chapter ${n})`, plan),
 		resourceBlock(manifest),
 	]
 		.filter(Boolean)

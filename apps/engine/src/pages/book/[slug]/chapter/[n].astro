@@ -1,7 +1,7 @@
 ---
 import Layout from "../../../../layouts/Layout.astro";
 import matter from "gray-matter";
-import { getBook, readBookFile, chapterRel, planSlice, stripComments } from "../../../../lib/books.js";
+import { getBook, readBookFile, chapterRel, stripComments } from "../../../../lib/books.js";
 import { loadSettings } from "../../../../lib/settings.js";
 
 const { slug, n } = Astro.params;
@@ -16,7 +16,6 @@ const chapterTitle = parsed.data.title || `Chapter ${num}`;
 const chapterBody = parsed.content.trim();
 
 const planText = stripComments(await readBookFile(slug, "plan.md"));
-const slice = planSlice(planText, num);
 const settings = await loadSettings();
 ---
 
@@ -38,9 +37,9 @@ const settings = await loadSettings();
   </div>
 
   <div class="card">
-    <h2>Plan slice for this chapter</h2>
-    <p class="note">What gets sent as the plan for chapter {num}. Edit here to control exactly what the model sees (edits are used for generation, not saved to plan.md).</p>
-    <textarea id="slice" style="min-height:140px" set:text={slice}></textarea>
+    <h2>Plan (context for this chapter)</h2>
+    <p class="note">The whole living plan is sent as context for chapter {num} — the model uses the running summary to know where it is. Edit here to control exactly what it sees (edits are used for this generation, not saved to plan.md).</p>
+    <textarea id="plan" style="min-height:140px" set:text={planText}></textarea>
   </div>
 
   <div class="card">
@@ -119,7 +118,7 @@ const settings = await loadSettings();
     $("status").textContent = "Generating from your prompts…";
     $("gen").disabled = true;
     try {
-      const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, task: "chapter", n: num, planSlice: $("slice").value, model: $("model").value }) });
+      const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, task: "chapter", n: num, plan: $("plan").value, model: $("model").value }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed.");
       editor.value = data.text.trim();
