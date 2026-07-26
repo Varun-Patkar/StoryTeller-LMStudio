@@ -71,14 +71,16 @@ export async function POST({ request }) {
 			messages.push({ role: "system", content: system });
 		messages.push({ role: "user", content: userPrompt });
 
-		const { text, steps } = await generateAgentic(settings, {
+		const { text, steps, usage } = await generateAgentic(settings, {
 			messages,
 			tools: getToolDefinitions(),
 			runTool: (name, args) => executeTool(slug, name, args),
 			model,
 			maxSteps: Number(settings.agentMaxSteps) || 8,
 		});
-		return json({ text, steps });
+		// The context window the session-usage gauge fills toward.
+		const contextMax = Number(contextLength) || null;
+		return json({ text, steps, usage, contextMax });
 	} catch (err) {
 		return json({ error: err.message }, 502);
 	}

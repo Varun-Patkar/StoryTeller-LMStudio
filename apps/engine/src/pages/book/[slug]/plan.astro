@@ -26,6 +26,7 @@ const settings = await loadSettings();
       <button class="btn" id="gen">Generate plan</button>
       <button class="btn ghost" id="save">Save</button>
       <span class="note" id="status"></span>
+      <span id="gauge" class="token-gauge"></span>
     </div>
     <textarea id="editor" style="min-height:480px" set:text={plan}></textarea>
   </div>
@@ -56,6 +57,7 @@ const settings = await loadSettings();
 </Layout>
 
 <script is:inline src="/model-picker.js"></script>
+<script is:inline src="/token-gauge.js"></script>
 <script define:vars={{ slug, defaultModel: settings.model }}>
   const $ = (id) => document.getElementById(id);
   const toast = (m, e = false) => { const t = $("toast"); t.textContent = m; t.className = "toast show" + (e ? " err" : ""); setTimeout(() => (t.className = "toast"), 2600); };
@@ -86,6 +88,7 @@ const settings = await loadSettings();
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed.");
       $("editor").value = data.text;
+      window.renderTokenGauge?.($("gauge"), data.usage?.peakTotal, data.contextMax);
       $("status").textContent = "Draft in editor — review, edit, then Save.";
     } catch (err) {
       $("status").textContent = "";
@@ -111,6 +114,7 @@ const settings = await loadSettings();
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed.");
       $("result-text").value = data.text.trim();
+      window.renderTokenGauge?.($("gauge"), data.usage?.peakTotal, data.contextMax);
       $("result").style.display = "block";
       $("rw-status").textContent = "";
     } catch (err) { $("rw-status").textContent = ""; toast(err.message, true); }

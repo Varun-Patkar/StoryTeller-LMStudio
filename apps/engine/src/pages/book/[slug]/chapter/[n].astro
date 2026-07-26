@@ -49,6 +49,7 @@ const settings = await loadSettings();
       <div class="row">
         <button class="btn" id="gen">Generate draft</button>
         <button class="btn ghost" id="save">Save chapter</button>
+        <span id="gauge" class="token-gauge"></span>
       </div>
     </div>
     <label for="title">Title</label>
@@ -92,6 +93,7 @@ const settings = await loadSettings();
 </Layout>
 
 <script is:inline src="/model-picker.js"></script>
+<script is:inline src="/token-gauge.js"></script>
 <script define:vars={{ slug, num, rel, defaultModel: settings.model }}>
   const $ = (id) => document.getElementById(id);
   const toast = (m, e = false) => { const t = $("toast"); t.textContent = m; t.className = "toast show" + (e ? " err" : ""); setTimeout(() => (t.className = "toast"), 2600); };
@@ -121,6 +123,7 @@ const settings = await loadSettings();
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed.");
       editor.value = data.text.trim();
+      window.renderTokenGauge?.($("gauge"), data.usage?.peakTotal, data.contextMax);
       $("status").textContent = "Draft in editor — edit it into something human, then Save.";
     } catch (err) { $("status").textContent = ""; toast(err.message, true); }
     finally { $("gen").disabled = false; }
@@ -144,6 +147,7 @@ const settings = await loadSettings();
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed.");
       $("result-text").value = data.text.trim();
+      window.renderTokenGauge?.($("gauge"), data.usage?.peakTotal, data.contextMax);
       $("result").style.display = "block";
       $("rw-status").textContent = "";
     } catch (err) { $("rw-status").textContent = ""; toast(err.message, true); }

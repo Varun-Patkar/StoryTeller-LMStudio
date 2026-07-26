@@ -321,3 +321,29 @@ select:focus {
 .spin {
 	opacity: 0.6;
 }
+
+/* Token-usage gauge (per-generation session usage) */
+.token-gauge {
+	display: none;
+	align-items: center;
+	vertical-align: middle;
+}
+.token-gauge .tg-track {
+	fill: none;
+	stroke: var(--line);
+	stroke-width: 6;
+}
+.token-gauge .tg-fill {
+	fill: none;
+	stroke: var(--accent);
+	stroke-width: 6;
+	stroke-linecap: round;
+	transition: stroke-dashoffset 0.6s ease;
+}
+.token-gauge .tg-num {
+	fill: var(--ink);
+	font-family: var(--mono);
+	font-size: 14px;
+	text-anchor: middle;
+	dominant-baseline: middle;
+}

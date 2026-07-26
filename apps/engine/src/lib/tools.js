@@ -11,7 +11,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import matter from "gray-matter";
 import { BOOKS_DIR, PROMPTS_DIR } from "./paths.js";
-import { safeSlug, readResourceRaw, stripComments } from "./books.js";
+import { safeSlug, readResourceRaw, writeBookFile, stripComments } from "./books.js";
 
 // Caps to keep tool results small (this is what actually reaches the model).
 const MAX_GREP_MATCHES = 60;
@@ -185,6 +185,27 @@ export async function readBookLines(slug, rel, startLine, endLine) {
 	return out.join("\n");
 }
 
+// Terseness cap for LLM-authored event entries — this content is read back later,
+// and we are on a token budget.
+const MAX_EVENT_CHARS = 1200;
+
+/**
+ * Create or update an entry in the story's EVENT WIKI (memory/events/<slug>.md). This is the
+ * agent-managed record of what this story changed relative to canon.md. Writing an existing
+ * title edits that entry (the model reads it first, then rewrites it with the update).
+ */
+export async function writeEvent(slug, title, content) {
+	slug = safeSlug(slug);
+	const t = String(title || "").trim();
+	if (!t) return "Provide a short title for the event.";
+	const body = String(content || "").trim().slice(0, MAX_EVENT_CHARS);
+	if (!body) return "Provide terse content for the event.";
+	const file = safeSlug(t) || "event";
+	const rel = `memory/events/${file}.md`;
+	await writeBookFile(slug, rel, `# ${t}\n\n${body}\n`);
+	return `Saved event "${t}" → ${rel}`;
+}
+
 /** OpenAI-compatible tool (function-calling) schema for the agentic loop. */
 export function getToolDefinitions() {
 	return [
@@ -246,6 +267,28 @@ export function getToolDefinitions() {
 				},
 			},
 		},
+		{
+			type: "function",
+			function: {
+				name: "write_event",
+				description:
+					"Create or update an entry in this story's EVENT WIKI (memory/events) — the agent-managed record of what THIS story changed relative to canon.md. Provide a short title and terse content; writing an existing title edits that entry (read it first with read_book_file to update it). Keep entries terse and plainly human — we are on a token budget. Use only for genuine divergences from canon, never to restate canon.",
+				parameters: {
+					type: "object",
+					properties: {
+						title: {
+							type: "string",
+							description: "Short title of the event, e.g. 'Sarah survives Outbreak Day'.",
+						},
+						content: {
+							type: "string",
+							description: "Terse markdown describing the divergence and what it affects.",
+						},
+					},
+					required: ["title", "content"],
+				},
+			},
+		},
 	];
 }
 
@@ -265,6 +308,8 @@ export async function executeTool(slug, name, args = {}) {
 				Number(args.start_line),
 				Number(args.end_line),
 			);
+		if (name === "write_event")
+			return await writeEvent(slug, args.title, args.content);
 		return `Unknown tool: ${name}`;
 	} catch (err) {
 		return `Tool "${name}" failed: ${err?.message || err}`;

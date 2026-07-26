@@ -25,28 +25,30 @@ This project is built entirely around that finding.
 
 ## The golden rule
 
-> **Not one iota of what is sent to LM Studio to generate the story may be AI-generated.**
+> **Almost nothing sent to LM Studio to generate the story is AI-generated — every prompt,
+> sample, and piece of world memory is yours, written by hand.**
 
-- **You** write the config, the world memory (characters, events, locations, …), and every
-  prompt, by hand.
-- **You** provide the writing samples / reference chapters.
-- The model produces only two things, and both are driven purely by _your_ prompts:
-  1. the **plan** (from your handwritten plan-prompt), and
-  2. the **chapter drafts** (from your handwritten chapter-prompt + the relevant slice of
-     that plan).
+- **You** write the config, the world memory (characters, locations, canon), and every
+  prompt (globally, once), by hand.
+- **You** provide the writing samples / reference chapters that teach your voice.
+- The model authors only the **plan**, the **chapter drafts**, and its own terse **event
+  wiki** of divergences from canon — all driven by _your_ prompts.
 - There is **no research, no crawling, no knowledge graph, no auto-generated instructions.**
 
-### The one exception (read this)
+### Two deliberate exceptions
 
-Each story ships with `prompts/system.md`. To give you a running start it contains an
-**AI-drafted, deliberately human-sounding first draft**. That is a placeholder, not the
-product.
+1. **`prompts/system.md`** ships as an AI-drafted, deliberately human-sounding placeholder —
+   and so does a fanfiction book's **`canon.md`** (draft canon with an AI, then humanize it).
+   Both carry the `<!-- AI-DRAFT: replace before real use -->` marker, and the engine's lint
+   flags any file that still has it.
+2. **`memory/events/`** is an _agent-managed_ wiki: the model creates and edits terse notes
+   on what each chapter changed relative to canon, and reads them back later for continuity.
+   This is the one place model-written text feeds future generations — a conscious trade to
+   keep long fanfiction consistent on a token budget.
 
-> ⚠️ **REMINDER TO SELF (Varun): before you generate anything real, rewrite every file in
-> `books/<slug>/prompts/` and `books/<slug>/prompts/samples/` in your own words and your own
-> hand. AI may write the first draft; a human must edit it into something human. The engine
-> flags any prompt file that still carries the `<!-- AI-DRAFT: replace before real use -->`
-> marker so you can't forget.**
+> ⚠️ **REMINDER: rewrite the global `prompts/` files and every book's `canon.md` in your own
+> words before generating anything real. AI may write the first draft; a human must edit it
+> into something human.**
 
 ---
 
@@ -62,23 +64,28 @@ engine (which talks to LM Studio and writes files) stays local.
 
 ---
 
-## Book layout
+## Layout
+
+Prompts are **author-level and global** (shared by every book); story data is **per-book**.
 
 ```
+prompts/                     # GLOBAL — shared by all books, written by you
+├── system.md                # AI DRAFT — replace, or leave empty to send no system framing
+├── plan-prompt.md           # how to generate a plan
+├── plan-rewrite-prompt.md   # how to revise a plan from a note
+├── chapter-prompt.md        # how to write a chapter
+├── rewrite-prompt.md        # how to revise prose from a note
+└── samples/*.md             # your reference prose (this teaches your voice)
+
 books/<slug>/
-├── config.md              # human — story settings (YAML frontmatter + notes)
-├── plan.md                # LLM — generated from YOUR plan-prompt (the only AI artifact)
-├── summary.md             # running per-chapter summaries
-├── prompts/               # human-owned
-│   ├── system.md          # AI DRAFT — replace with your own writing
-│   ├── plan-prompt.md     # your instructions for generating the plan
-│   ├── chapter-prompt.md  # your instructions for writing a chapter
-│   ├── rewrite-prompt.md  # your instructions for rewriting via comments
-│   └── samples/           # your reference prose / chapters
-├── memory/                # human-written "memory" the model is grounded in
-│   ├── characters/*.md
-│   ├── events/*.md
-│   └── locations/*.md
+├── config.md                # story settings (YAML frontmatter + notes)
+├── canon.md                 # fanfiction only — the full source-canon storyline
+├── plan.md                  # LLM — chapter-by-chapter outline
+├── summary.md               # running per-chapter summaries
+├── memory/
+│   ├── characters/*.md       # human-written
+│   ├── locations/*.md        # human-written
+│   └── events/*.md           # AGENT-managed wiki of divergences from canon
 └── chapters/
     └── chapter-01.md ...
 ```
@@ -87,26 +94,49 @@ books/<slug>/
 
 ## Workflow
 
-1. **Create a book** and fill in `config.md` (type, fandom/setting, genre, themes, pacing,
-   divergence point, …).
-2. **Write the memory** — add characters, events, locations as markdown.
-3. **Write the prompts** — replace the AI drafts in `prompts/` with your own words; add
-   writing samples.
-4. **Generate the plan** — the engine sends _your_ plan-prompt + config + memory + samples to
-   LM Studio and saves `plan.md`. Edit it freely.
-5. **Write a chapter** — pick a chapter; the engine sends _your_ chapter-prompt + the relevant
-   plan slice + memory + samples + prior summary. Draft appears; you edit it.
-6. **Rewrite by comment** — select any part of the chapter (or none, for the whole thing),
-   leave a comment, and the engine asks the model to revise just that, guided by _your_
-   rewrite-prompt. Keep or discard.
+1. **Write your global prompts once** — in the engine's **Prompts** tab (or the repo-root
+   `prompts/` folder): system, plan, plan-rewrite, chapter, rewrite, and your samples.
+2. **Create a book** and fill in `config.md`. For fanfiction, fill in `canon.md` (draft with
+   an AI if you like, then humanize).
+3. **Write the memory** — add characters and locations as markdown. (Events are written by
+   the agent as it goes.)
+4. **Generate the plan** — pick a model; the engine sends _your_ plan-prompt and lets the
+   model read config, canon, and memory via tools, then saves `plan.md`. Edit freely, or
+   **rewrite by comment** (select part, or none for the whole plan).
+5. **Write a chapter** — the engine sends _your_ chapter-prompt + the plan slice; the model
+   reads samples/memory/canon on demand, may record divergences to the event wiki, and
+   returns a draft. Edit it.
+6. **Rewrite by comment** — select any part of a chapter (or none for the whole thing), leave
+   a note, and the model revises just that, guided by _your_ rewrite-prompt. Keep or discard.
 7. **Publish** — commit; the reader deploys to GitHub Pages.
+
+---
+
+## How generation works (the agentic loop)
+
+Instead of stuffing every memory and sample file into one giant prompt, the engine hands the
+model a lean prompt — your instruction + the task input (plan slice / text to revise) + a
+**manifest** of what exists — plus a small set of tools. The model then gathers only what it
+needs:
+
+- `list_resources` — list config, canon, plan, summary, memory, samples, prior chapters.
+- `grep_book` — search across those files (returns `path:line: snippet`).
+- `read_book_file` — read a file, optionally a line range.
+- `write_event` — create or edit an entry in the story's event wiki (divergences from canon).
+
+The loop (chat + function-calling against LM Studio's `/v1/chat/completions`) executes the
+tool calls against your human files and repeats until the model returns final prose — using
+far fewer tokens than a full-context dump. A circular **token gauge** on each generation
+shows that run's usage against the model's context window, and models are **loaded
+just-in-time** at the context length you set per model in **Settings**.
 
 ---
 
 ## Setup
 
-Prerequisites: **Node 18.17+**, **LM Studio** running locally with its server enabled
-(OpenAI-compatible `/v1`), and at least one chat model available.
+Prerequisites: **Node 22+**, **LM Studio** running locally with its server enabled
+(OpenAI-compatible `/v1`) and a model that **supports tool / function calling**, plus at
+least one chat model available.
 
 ```powershell
 npm install
@@ -121,16 +151,23 @@ npm run reader
 npm run reader:build
 ```
 
-On first run, open the engine's **Settings** page and point it at your LM Studio server
-(base URL, optional API key), then load a model.
+On first run, open the engine's **Settings** page, point it at your LM Studio server (base
+URL, optional API key), **Refresh models**, set each model's context length, and **Save**.
+Models load automatically when you generate — there is no manual load step.
 
 ---
 
 ## Design choices
 
-- **Completions, not chat.** Generation uses LM Studio's `/v1/completions` for the purest
-  style-mimicry (matches the "no system prompt" finding). A chat fallback exists.
-- **No graph, no research.** Memory is plain human-written markdown. Nothing is fetched.
+- **Agentic, not full-context.** Generation is a tool-calling loop: the model reads only the
+  slices of memory/canon/samples it needs, keeping token use low. (It needs a model that
+  supports function calling.)
+- **Global prompts, per-book world.** You write prompts and samples once; each book carries
+  only its own config, canon, memory, plan, and chapters.
+- **Agent-managed event wiki.** The model keeps a terse, editable record of divergences from
+  canon so long fanfiction stays consistent.
+- **Just-in-time models.** The chosen model loads on demand at your configured context
+  length; no manual load/unload.
 - **Engine is local-only.** Only the reader is published, so nothing that talks to your
   machine or LM Studio ever ships.
 

@@ -125,13 +125,15 @@ const s = await loadSettings();
       row.style.alignItems = "center";
       row.style.borderTop = "1px solid var(--line)";
       row.style.padding = "12px 0";
-      const ctx = contextLengths[m.key] ?? "";
+      // Prefill: saved value, else the model's full context window (not a blank "default").
+      const ctx = contextLengths[m.key] ?? m.maxContext ?? "";
+      const ph = m.maxContext ? `max ${m.maxContext}` : "default";
       row.innerHTML = `
         <div><div>${m.displayName}</div><div class="mono">${m.key}</div></div>
         <div class="row" style="align-items:center">
           <span class="pill ${m.loaded ? "on" : ""}">${m.loaded ? "loaded" : "idle"}</span>
           <label class="mono" style="margin:0">Context</label>
-          <input data-ctx="${m.key}" type="number" step="1024" min="0" value="${ctx}" placeholder="default" style="width:130px" />
+          <input data-ctx="${m.key}" type="number" step="1024" min="0" value="${ctx}" placeholder="${ph}" style="width:130px" />
         </div>`;
       box.appendChild(row);
     }

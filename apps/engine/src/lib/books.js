@@ -308,7 +308,7 @@ function resourceBlock(manifest) {
 	return [
 		"## Available resources",
 		manifest,
-		"Read the resources you need with the tools (list_resources, grep_book, read_book_file) before writing. Read the writing samples to match the voice, and check memory and canon for facts — do not contradict them or invent facts they cover. Your final reply must contain only the requested text, with no tool commentary.",
+		"Read the resources you need with the tools (list_resources, grep_book, read_book_file) before writing. Read the writing samples to match the voice. For fanfiction, `canon.md` is the full source storyline — treat it as true. `memory/events` is your own event wiki of DIVERGENCES from canon (what this story changed); read it to stay consistent, and whenever this text changes something away from canon, create or update an entry with the write_event tool (read an entry first if you are editing it). Keep anything you record terse and plainly human — we are on a token budget. Do not contradict `canon.md`, `memory/`, or facts you have read. Your final reply must contain only the requested text, with no tool commentary.",
 	].join("\n\n");
 }
 

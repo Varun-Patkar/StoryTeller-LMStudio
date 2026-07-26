@@ -50,6 +50,12 @@ export async function listModels(settings) {
 				key,
 				displayName: m.displayName || key,
 				loaded: loadedKeys.has(key),
+				// Model's max context window (tokens), best-effort across SDK shapes.
+				maxContext:
+					m.maxContextLength ??
+					m.contextLength ??
+					m.config?.maxContextLength ??
+					null,
 			};
 		})
 		.filter((m) => m.key);
@@ -190,6 +196,18 @@ export async function generateAgentic(
 	const modelName = model || settings.model || undefined;
 	const convo = [...messages];
 
+	// Token accounting across rounds. `peakTotal` is the fullest the context got
+	// (prompt + that round's completion) — what the session-usage gauge fills toward.
+	const usage = { peakTotal: 0, prompt: 0, completion: 0, cumulative: 0 };
+	function tallyUsage(u) {
+		if (!u) return;
+		const total = Number(u.total_tokens || 0);
+		usage.peakTotal = Math.max(usage.peakTotal, total);
+		usage.prompt = Math.max(usage.prompt, Number(u.prompt_tokens || 0));
+		usage.completion += Number(u.completion_tokens || 0);
+		usage.cumulative += total;
+	}
+
 	for (let step = 0; step <= maxSteps; step++) {
 		// On the final allowed step, stop offering tools so the model must answer.
 		const offerTools = step < maxSteps;
@@ -212,13 +230,14 @@ export async function generateAgentic(
 				`LM Studio chat error ${res.status}: ${await res.text()}`,
 			);
 		const data = await res.json();
+		tallyUsage(data.usage);
 		const msg = data.choices?.[0]?.message;
 		if (!msg) throw new Error("LM Studio returned no message.");
 		convo.push(msg);
 
 		const calls = msg.tool_calls || [];
 		if (!calls.length) {
-			return { text: msg.content ?? "", steps: step };
+			return { text: msg.content ?? "", steps: step, usage };
 		}
 
 		// Execute every requested tool and feed the results back in.
@@ -241,6 +260,6 @@ export async function generateAgentic(
 	}
 	// Ran out of steps without a plain answer; return the last content if any.
 	const last = [...convo].reverse().find((m) => m.role === "assistant");
-	return { text: last?.content ?? "", steps: maxSteps };
+	return { text: last?.content ?? "", steps: maxSteps, usage };
 }
 
