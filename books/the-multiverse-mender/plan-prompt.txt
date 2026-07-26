@@ -1,0 +1,61 @@
+Build a full chapter-by-chapter plan for Arc One of this story: the entire Kingdom Come saga,
+both games, from the fall of Skalitz to the end of the war. Read config.md, canon.md, and
+everything in memory/ first. Keep it an outline, not prose. Follow the canon in canon.md as
+true EXCEPT where this plan changes it below. Do not write the separate prologue (the gamer's
+death and meeting the god); this arc begins in Skalitz.
+
+Point of view stays close on Hugo, third person. The system appears as short bracketed, bolded
+notes only when it matters, never crowding the scene. No em dashes anywhere. Simple, grounded
+words in the register of the game.
+
+The changes this plan must weave through the canon:
+
+- Hugo is the true-born son of Martin and Jane, and Henry's younger half-brother by one year
+  (they share their mother; Henry's blood father is Radzig, unknown to all). Hugo's memories of
+  his past life and of this world wake at twelve after a fall that nearly kills him, giving him
+  six years before Skalitz burns. Henry is nineteen and Hugo eighteen when it falls.
+
+- In those six years Hugo cannot warn anyone; he is only a smith's son and no lord would believe
+  him. So he prepares quietly. He trains in secret, grows real skill at the forge, the blade,
+  the bow, and uses his memory of this world to find hidden caches, camps, herbs, and coin near
+  Skalitz to arm and ready the family. Show the strain of knowing what is coming and being unable
+  to say it.
+
+- When Skalitz falls, Hugo saves Martin, Jane, and Henry, and gets them all out to Talmberg while
+  fleeing. The parents live.
+
+- Henry's parents live, so his revenge is real but less consuming than in canon. His drive is
+  vengeance for Bianca, his sweetheart killed in the raid, and for the people of Skalitz who
+  died. His canon target stays the same: Sir Markvart von Aulitz, the general who led the sack.
+
+- Henry must still walk his own canon road. He goes back to the ruins to search for survivors,
+  and his father's sword is stolen there by the bandits Runt and Zbyshek. Hugo shadows him and
+  helps save him alongside Theresa, the two of them holding on until Captain Bernard arrives.
+  Hugo allows Henry's story to happen; he does not live it for him.
+
+- Istvan Toth dies before the end of the first game, at the Vranik and Talmberg climax, rather
+  than surviving to Trosky. Remove Toth from all second-game events.
+
+- Because Toth is gone, the second game shifts: the lords' message actually reaches Trosky and is
+  delivered to Otto von Bergow, but Henry and Hans are still ambushed by Zizka's band in the
+  Bohemian Paradise. There Hugo makes clear to Zizka which side they are on, that they stand for
+  Wenceslaus and that Otto and Sigismund are the enemy. No Toth meddles now. Erik is at the
+  ambush but recognises Hans and his band and slips away rather than fight. Erik dies later,
+  during the second game.
+
+- Henry learns near the end of the first game that Radzig is his true father, and with it that he
+  and Hugo are half-brothers through their mother. But the truth of what Hugo really is, a
+  traveller across worlds, is revealed only at the very end of the whole arc, and only to Henry.
+
+- Hugo has a brief, honest fling with Rosa Ruthard in Kuttenberg (the romance canon gives Henry).
+  Both know it goes nowhere: for her a matter of station, for him because he will not be here
+  forever, though he cannot tell her why.
+
+- The whole of both games must be experienced across the plan. End the arc where the war ends:
+  Erik dead, Henry going home to the mill with Theresa and their living parents to a normal life.
+  Hugo tells Henry the truth, says his goodbye, and leaves this world. That final reveal and
+  farewell is the last beat of the arc.
+
+Structure the plan so the six preparation years, the fall of Skalitz, the whole first game, the
+whole second game, and the ending each get their due weight, as a numbered chapter-by-chapter
+outline.
